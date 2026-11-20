@@ -14,7 +14,7 @@
     "docs:pdf": "node docs/build-pdf.mjs"
   },
   "devDependencies": {
-    "markdown-it": "^15.0.1",
+    "markdown-it": "^15.0.3",
     "mermaid": "^11.17.2",
     "playwright-core": "^1.63.0"
   },
