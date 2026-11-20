@@ -58,13 +58,44 @@ test("place_code_column_follows_place_column", async () => {
   assert.deepEqual(def.inputs?.places, { kind: "table", tableId: "somalia_regions", format: "csv" })
 })
 
-test("unpivot_replaces_source_columns", async () => {
+test("unpivot_adds_date_and_value_columns", async () => {
   const r = recipe({
-    columns: [{ from: "r", id: "region", type: "text" }, { from: "w1", id: "w1", type: "number" }, { from: "w2", id: "w2", type: "number" }],
+    columns: [{ from: "r", id: "region", type: "place" }],
     cleanup: { unpivot: { columns: ["w1", "w2"], dateColumnId: "period_date", valueColumnId: "value" } },
   })
   const def = await buildDefinition(input(r), LIBRARY)
-  assert.deepEqual((def.destinations[0] as any).columns.map((c: any) => [c.id, c.type]), [["region", "text"], ["period_date", "date"], ["value", "number"]])
+  assert.deepEqual((def.destinations[0] as any).columns.map((c: any) => [c.id, c.type]),
+    [["region", "text"], ["region_code", "text"], ["period_date", "date"], ["value", "number"]])
+  validateDefinition(def)
+})
+
+test("unpivot_validation", async () => {
+  const base = { columns: [{ from: "r", id: "region", type: "text" as const }] }
+  const un = (u: object) => recipe({ ...base, cleanup: { unpivot: { columns: ["w1"], dateColumnId: "d", valueColumnId: "v", ...u } as any } })
+  await assert.rejects(buildDefinition(input(un({ columns: [] })), LIBRARY), /unpivot/i)
+  await assert.rejects(buildDefinition(input(un({ dateColumnId: "Bad" })), LIBRARY), /Bad/)
+  await assert.rejects(buildDefinition(input(un({ dateColumnId: "region" })), LIBRARY), /region/)
+  await assert.rejects(buildDefinition(input(un({ valueColumnId: "d" })), LIBRARY), /different/)
+})
+
+test("merge_key_may_be_unpivot_date_column", async () => {
+  const r = recipe({
+    source: { url: "https://x.org/api" }, writeMode: "merge", mergeKey: "period_date",
+    columns: [{ from: "r", id: "region", type: "text" }],
+    cleanup: { unpivot: { columns: ["w1"], dateColumnId: "period_date", valueColumnId: "value" } },
+  }, "web_api")
+  const def = await buildDefinition(input(r), LIBRARY)
+  assert.deepEqual((def.destinations[0] as any).mergeColumns, ["period_date"])
+  validateDefinition(def)
+})
+
+test("inspect_with_no_columns", async () => {
+  const r = recipe({ columns: [], mode: "inspect" })
+  const def = await buildDefinition(input(r), LIBRARY)
+  assert.equal(def.recipe?.config.mode, "inspect")
+  try { validateDefinition(def) } catch (e) { assert.fail(`inspect definition should validate: ${e}`) }
+  await assert.rejects(buildDefinition(input(recipe({ columns: [] })), LIBRARY), /at least one column/)
+  await assert.rejects(buildDefinition(input(recipe({ columns: [], mode: "preview" })), LIBRARY), /at least one column/)
 })
 
 test("upload_declares_file_slot", async () => {
@@ -104,7 +135,7 @@ test("merge_requires_key", async () => {
 test("merge_key_removed_by_unpivot_is_rejected", async () => {
   const r = recipe({
     source: { url: "https://x.org/api" }, writeMode: "merge", mergeKey: "w1",
-    columns: [{ from: "r", id: "region", type: "text" }, { from: "w1", id: "w1", type: "number" }],
+    columns: [{ from: "r", id: "region", type: "text" }],
     cleanup: { unpivot: { columns: ["w1"], dateColumnId: "period_date", valueColumnId: "value" } },
   }, "web_api")
   await assert.rejects(buildDefinition(input(r), LIBRARY), /merge key "w1"/)

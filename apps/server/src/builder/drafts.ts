@@ -406,7 +406,7 @@ export class BuilderService {
     if (!id) throw new BuilderError(400, "Give the source an id before reading it.")
     if (!recipe) throw new BuilderError(400, "Choose a connector before reading the source.")
     try {
-      validateRecipe(recipe)
+      validateRecipe(recipe, mode === "inspect")
     } catch (err) {
       throw new BuilderError(400, err instanceof Error ? err.message : String(err))
     }

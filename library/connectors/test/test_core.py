@@ -129,5 +129,39 @@ class CoreTests(unittest.TestCase):
             self.assertEqual(read_places(Ctx(d, d), PLACES), [{"name": "Banaadir", "code": "SO22"}])
 
 
+class UnpivotAndInspectTests(unittest.TestCase):
+    def _ctx(self, cfg):
+        class C:
+            pass
+        c = C()
+        c.out_dir = tempfile.mkdtemp()
+        c.in_dir = ""
+        c.definition = {"id": "t", "recipe": {"config": cfg}}
+        return c
+
+    def test_unpivot_end_to_end(self):
+        from _core import process
+        raw = pd.DataFrame({"region": ["A", "B"], "2024-01-01": ["1", "2"], "2024-02-01": ["3", "4"]})
+        cfg = {"columns": [{"from": "region", "id": "region", "type": "text"}],
+               "cleanup": {"unpivot": {"columns": ["2024-01-01", "2024-02-01"], "dateColumnId": "period_date", "valueColumnId": "value"}}}
+        ctx = self._ctx(cfg)
+        result = process(ctx, raw)
+        out = pd.read_csv(os.path.join(ctx.out_dir, "t.csv"))
+        self.assertEqual(list(out.columns), ["region", "period_date", "value"])
+        self.assertEqual(len(out), 4)
+        self.assertEqual(out[out.region == "A"]["period_date"].tolist(), ["2024-01-01", "2024-02-01"])
+        self.assertEqual(out[out.region == "B"]["value"].tolist(), [2, 4])
+        self.assertEqual(result["state"]["rows"], 4)
+
+    def test_inspect_with_no_columns_writes_inspect_json(self):
+        from _core import process
+        ctx = self._ctx({"columns": [], "mode": "inspect", "cleanup": {}})
+        process(ctx, pd.DataFrame({"a": ["x", "y"]}))
+        with open(os.path.join(ctx.out_dir, "inspect.json")) as f:
+            data = json.load(f)
+        self.assertEqual(data["rows"], 2)
+        self.assertEqual(data["columns"][0]["name"], "a")
+
+
 if __name__ == "__main__":
     unittest.main()

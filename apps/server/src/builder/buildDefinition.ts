@@ -8,7 +8,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "obj
 const hasText = (v: unknown) => typeof v === "string" && v.trim() !== ""
 
 /** Throws a user-readable Error when the recipe cannot be built or run. */
-export function validateRecipe(recipe: Recipe): void {
+export function validateRecipe(recipe: Recipe, inspect = recipe?.config?.mode === "inspect"): void {
   const info = CONNECTORS[recipe?.connector]
   if (!info) throw new Error(`Unknown connector "${recipe?.connector}".`)
   if (!Number.isInteger(recipe.connectorVersion) || recipe.connectorVersion < 1) {
@@ -17,7 +17,7 @@ export function validateRecipe(recipe: Recipe): void {
   const c = recipe.config
   if (!isObject(c)) throw new Error("The recipe has no settings.")
   if (!isObject(c.source)) throw new Error("The source settings are missing.")
-  if (!Array.isArray(c.columns) || c.columns.length === 0) throw new Error("Choose at least one column.")
+  if (!Array.isArray(c.columns) || (c.columns.length === 0 && !inspect)) throw new Error("Choose at least one column.")
   for (const col of c.columns) {
     if (!isObject(col) || !hasText(col.from) || !hasText(col.id) || !hasText(col.type)) {
       throw new Error("Each column needs a source name, an id and a type.")
@@ -29,6 +29,23 @@ export function validateRecipe(recipe: Recipe): void {
   }
   const ids = c.columns.map((x) => x.id)
   if (new Set(ids).size !== ids.length) throw new Error("Column ids must be unique.")
+
+  // Columns describe the table after clean-up: with an unpivot they are the id columns that remain
+  const unpivot = c.cleanup?.unpivot
+  if (unpivot) {
+    if (!Array.isArray(unpivot.columns) || unpivot.columns.length === 0 || !unpivot.columns.every(hasText)) {
+      throw new Error("Choose the columns to unpivot.")
+    }
+    for (const [what, id] of [["date", unpivot.dateColumnId], ["value", unpivot.valueColumnId]] as const) {
+      if (typeof id !== "string" || !ID_PATTERN.test(id)) {
+        throw new Error(`The unpivot ${what} column id "${id}" is not valid: use lowercase letters, digits and underscores, starting with a letter.`)
+      }
+    }
+    if (unpivot.dateColumnId === unpivot.valueColumnId) throw new Error("The unpivot date and value columns need different ids.")
+    for (const id of [unpivot.dateColumnId, unpivot.valueColumnId]) {
+      if (ids.includes(id)) throw new Error(`The unpivot column id "${id}" is already used by another column.`)
+    }
+  }
 
   assertNoSecretLikeKeys(c.source)
   const s = c.source
@@ -53,9 +70,9 @@ export function validateRecipe(recipe: Recipe): void {
   if (!info.writeModes.includes(c.writeMode)) {
     throw new Error(`Write mode "${c.writeMode}" is not available for ${info.label.en}: use ${info.writeModes.join(" or ")}.`)
   }
-  if (c.writeMode === "merge") {
+  if (c.writeMode === "merge" && !inspect) {
     if (!hasText(c.mergeKey)) throw new Error("Choose a key column to merge on.")
-    if (!ids.includes(c.mergeKey as string)) throw new Error(`The merge key "${c.mergeKey}" is not one of the columns.`)
+    // The final table is checked in buildDefinition: the key may be a place code or the unpivot date column
   }
   if (c.places && isObject(c.places.matches) && Object.keys(c.places.matches).length > MAX_MATCHES) {
     throw new Error(`At most ${MAX_MATCHES} place matches are allowed.`)
@@ -79,28 +96,20 @@ export async function buildDefinition(input: BuildInput, libraryPath: string): P
   const info = CONNECTORS[connector]
 
   const unpivot = config.cleanup?.unpivot
-  const unpivoted = new Set(unpivot?.columns ?? [])
   const columns: ColumnSpec[] = []
-  let valueAdded = false
-  const addUnpivot = () => {
-    if (!unpivot || valueAdded) return
-    valueAdded = true
-    columns.push({ id: unpivot.dateColumnId, type: "date" }, { id: unpivot.valueColumnId, type: "number" })
-  }
   for (const col of config.columns) {
-    if (unpivoted.has(col.from) || unpivoted.has(col.id)) { addUnpivot(); continue }
     const spec: ColumnSpec = { id: col.id, type: col.type === "place" ? "text" : col.type }
     if (col.unit) spec.units = col.unit
     columns.push(spec)
     if (col.type === "place") columns.push({ id: `${col.id}_code`, type: "text" })
   }
-  addUnpivot()
+  if (unpivot) columns.push({ id: unpivot.dateColumnId, type: "date" }, { id: unpivot.valueColumnId, type: "number" })
 
   const ids = columns.map((c) => c.id)
   if (new Set(ids).size !== ids.length) throw new Error("Column ids must be unique, including the generated place code and unpivot columns.")
 
-  if (config.writeMode === "merge" && !ids.includes(config.mergeKey as string)) {
-    throw new Error(`The merge key "${config.mergeKey}" is not a column of the saved table (it may be removed by unpivoting). Choose another key.`)
+  if (config.writeMode === "merge" && config.mode !== "inspect" && !ids.includes(config.mergeKey as string)) {
+    throw new Error(`The merge key "${config.mergeKey}" is not a column of the saved table (the unpivoted columns are replaced by the date and value columns). Choose another key.`)
   }
 
   const def: IntegrationDefinition = {

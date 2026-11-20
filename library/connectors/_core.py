@@ -17,7 +17,7 @@ import requests
 __all__ = [
     "normalise", "apply_cleanup", "apply_columns", "match_places", "read_places", "finish",
     "recipe_config", "UNMATCHED_LIMIT", "PREVIEW_ROWS", "http_get", "read_tabular", "fetch_table",
-    "cap_rows", "process", "table_kind", "http_json", "row_limit",
+    "cap_rows", "process", "unpivot_columns", "table_kind", "http_json", "row_limit",
 ]
 
 UNMATCHED_LIMIT = 50
@@ -92,12 +92,22 @@ def apply_cleanup(df, cleanup):
     return df
 
 
-def apply_columns(df, columns):
+def unpivot_columns(cleanup):
+    """The two columns an unpivot creates, as column specs (already named, so from == id)."""
+    unpivot = (cleanup or {}).get("unpivot")
+    if not unpivot:
+        return []
+    return [{"from": unpivot["dateColumnId"], "id": unpivot["dateColumnId"], "type": "date"},
+            {"from": unpivot["valueColumnId"], "id": unpivot["valueColumnId"], "type": "number"}]
+
+
+def apply_columns(df, columns, extra=()):
     """Keep and rename the mapped columns and cast them. Values that fail a cast become empty and
-    are reported (one message each) rather than dropping the row."""
+    are reported (one message each) rather than dropping the row. `extra` are further specs
+    appended after `columns` (the date and value columns an unpivot creates)."""
     errors = []
     out = pd.DataFrame(index=df.index)
-    for spec in columns:
+    for spec in list(columns) + list(extra):
         source, target, kind = spec["from"], spec["id"], spec.get("type", "text")
         if source not in df.columns:
             raise ValueError(f"Column not found in the source: {source}")
@@ -299,7 +309,8 @@ def cap_rows(df, cfg):
 def process(ctx, raw):
     """Everything after reading: inspect output, clean-up, typing, places, output."""
     cfg = recipe_config(ctx)
-    wanted = [c["from"] for c in cfg.get("columns") or []]
+    extra = unpivot_columns(cfg.get("cleanup"))
+    wanted = [c["from"] for c in (cfg.get("columns") or []) + extra]
     if len(raw) == 0:
         # An empty source gives an empty table with every declared column, not a failure
         print("No rows in the source")
@@ -315,7 +326,7 @@ def process(ctx, raw):
         with open(os.path.join(ctx.out_dir, "inspect.json"), "w", encoding="utf-8") as f:
             json.dump({"columns": columns, "rows": int(len(df))}, f)
         return {"tables": [], "state": {}}
-    df, type_errors = apply_columns(df, cfg.get("columns") or [])
+    df, type_errors = apply_columns(df, cfg.get("columns") or [], extra)
     unmatched = []
     places = cfg.get("places")
     if places:
