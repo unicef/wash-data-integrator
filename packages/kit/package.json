@@ -35,7 +35,7 @@
   "dependencies": {
     "dompurify": "^3.4.13",
     "echarts": "^6.0.0",
-    "maplibre-gl": "^6.2.0",
+    "maplibre-gl": "^6.4.1",
     "marked": "^18.0.9",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
