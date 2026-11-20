@@ -70,17 +70,20 @@ test("unpivot_replaces_source_columns", async () => {
 test("upload_declares_file_slot", async () => {
   const def = await buildDefinition(input(recipe({}, "upload")), LIBRARY)
   assert.deepEqual(def.files, { data: { accept: [".csv", ".xlsx"] } })
+  validateDefinition(def)
 })
 
 test("webhook_sets_trigger_and_append", async () => {
   const def = await buildDefinition(input(recipe({ writeMode: "append", source: { sampleMessage: { a: 1 } } }, "webhook")), LIBRARY)
   assert.equal(def.trigger.webhook, true)
   assert.equal((def.destinations[0] as any).action, "append")
+  validateDefinition(def)
 })
 
 test("web_api_key_declares_secret_only", async () => {
   const def = await buildDefinition(input(recipe({ source: { url: "https://x.org/api", auth: "key" } }, "web_api")), LIBRARY)
   assert.deepEqual(def.secrets, ["api_key"])
+  validateDefinition(def)
   assert.ok(!JSON.stringify(def.recipe).includes("secret"))
   const none = await buildDefinition(input(recipe({ source: { url: "https://x.org/api", auth: "none" } }, "web_api")), LIBRARY)
   assert.equal(none.secrets, undefined)
@@ -95,6 +98,22 @@ test("merge_requires_key", async () => {
   const def = await buildDefinition(input(r), LIBRARY)
   assert.deepEqual((def.destinations[0] as any).mergeColumns, ["region"])
   assert.equal((def.destinations[0] as any).action, "merge")
+  validateDefinition(def)
+})
+
+test("merge_key_removed_by_unpivot_is_rejected", async () => {
+  const r = recipe({
+    source: { url: "https://x.org/api" }, writeMode: "merge", mergeKey: "w1",
+    columns: [{ from: "r", id: "region", type: "text" }, { from: "w1", id: "w1", type: "number" }],
+    cleanup: { unpivot: { columns: ["w1"], dateColumnId: "period_date", valueColumnId: "value" } },
+  }, "web_api")
+  await assert.rejects(buildDefinition(input(r), LIBRARY), /merge key "w1"/)
+})
+
+test("missing_cleanup_is_treated_as_empty", async () => {
+  const r = recipe(); delete (r.config as any).cleanup
+  const def = await buildDefinition(input(r), LIBRARY)
+  assert.equal((def.destinations[0] as any).columns.length, 3)
 })
 
 test("recipe_validation_rejects_bad_input", async () => {

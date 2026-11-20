@@ -77,7 +77,7 @@ export async function buildDefinition(input: BuildInput, libraryPath: string): P
   const { connector, config } = input.recipe
   const info = CONNECTORS[connector]
 
-  const unpivot = config.cleanup.unpivot
+  const unpivot = config.cleanup?.unpivot
   const unpivoted = new Set(unpivot?.columns ?? [])
   const columns: ColumnSpec[] = []
   let valueAdded = false
@@ -98,11 +98,15 @@ export async function buildDefinition(input: BuildInput, libraryPath: string): P
   const ids = columns.map((c) => c.id)
   if (new Set(ids).size !== ids.length) throw new Error("Column ids must be unique, including the generated place code and unpivot columns.")
 
+  if (config.writeMode === "merge" && !ids.includes(config.mergeKey as string)) {
+    throw new Error(`The merge key "${config.mergeKey}" is not a column of the saved table (it may be removed by unpivoting). Choose another key.`)
+  }
+
   const def: IntegrationDefinition = {
     id: input.id,
     name: input.name,
     source: input.source,
-    trigger: input.trigger.webhook === undefined && info.needsWebhook ? { ...input.trigger, webhook: true } : { ...input.trigger },
+    trigger: { ...input.trigger },
     runtime: "python",
     destinations: [{
       kind: "table",
