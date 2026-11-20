@@ -80,9 +80,7 @@ export function StepPreview({ model }: { model: BuilderModel }) {
               <p className="dim">{T`These values are left empty. Go back to Columns to change the kind of values, or fix them in the source.`}</p>
               <ul>
                 {preview.typeErrors.map((line, i) => (
-                  <li key={i}>
-                    <code>{line}</code>
-                  </li>
+                  <li key={i}>{line}</li>
                 ))}
               </ul>
             </div>

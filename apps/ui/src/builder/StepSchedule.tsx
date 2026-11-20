@@ -6,28 +6,36 @@
 import { useState } from "react"
 import { CronDraft, CronEditor, fromCronDraft, toCronDraft } from "../CronEditor.js"
 import { Field, StepNav } from "./shared.js"
-import { BuilderModel, ID_PATTERN } from "./useBuilderDraft.js"
+import { BuilderModel, ID_PATTERN, usePending, Work } from "./useBuilderDraft.js"
 
 /** The name and schedule step. */
 export function StepSchedule({ model }: { model: BuilderModel }) {
   const { work } = model
   const [name, setName] = useState(work.name)
   const [id, setId] = useState(work.id)
-  const [cronDraft, setCronDraft] = useState<CronDraft>(() => toCronDraft(work.cron ?? "0 6 * * *"))
+  // Daily at 06:00 UTC is offered only until a schedule was saved; after that an empty one means Manual only
+  const [cronDraft, setCronDraftState] = useState<CronDraft>(() => toCronDraft(work.scheduleSet ? work.cron : "0 6 * * *"))
+  const [cronTouched, setCronTouched] = useState(false)
+  const setCronDraft = (draft: CronDraft) => {
+    setCronDraftState(draft)
+    setCronTouched(true)
+  }
   const [provider, setProvider] = useState(work.provider)
   const [license, setLicense] = useState(work.license)
   const [limitations, setLimitations] = useState(work.limitations)
   const [problem, setProblem] = useState<string | null>(null)
   const scheduled = work.connector !== "upload" && work.connector !== "webhook"
 
-  const patch = () => ({
+  /** The step's fields; the schedule only once it was chosen here or saved before. */
+  const patch = (chosen = cronTouched || work.scheduleSet): Partial<Work> => ({
     name,
     id: id.trim(),
-    cron: scheduled ? fromCronDraft(cronDraft) : null,
     provider,
     license,
-    limitations
+    limitations,
+    ...(chosen ? { cron: scheduled ? fromCronDraft(cronDraft) : null, scheduleSet: true } : {})
   })
+  usePending(model, () => patch())
 
   async function next() {
     if (!name.trim()) {
@@ -39,7 +47,7 @@ export function StepSchedule({ model }: { model: BuilderModel }) {
       return
     }
     setProblem(null)
-    await model.goTo("accept", patch())
+    await model.goTo("accept", patch(true))
   }
 
   return (

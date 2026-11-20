@@ -202,7 +202,7 @@ function WebApiFields({ model, setSource }: { model: BuilderModel; setSource: (p
       </Field>
       <Field
         label={T`Where the records are (optional)`}
-        help={T`If the list of records sits inside the answer, give its path, for example data.items. Leave empty when the answer is the list.`}
+        help={T`Leave empty when the answer is just the list of records. If the list sits inside the answer under a name, give that name. For example: data.items`}
       >
         <input type="text" value={text(source, "recordsPath")} onChange={e => setSource({ recordsPath: e.target.value })} />
       </Field>
@@ -223,7 +223,7 @@ function WebApiFields({ model, setSource }: { model: BuilderModel; setSource: (p
       </Field>
       {paging.type === "page" && (
         <div className="builder-row">
-          <Field label={T`Page setting name`} help={T`The name in the address that picks the page, often page.`}>
+          <Field label={T`Name of the page number setting`} help={T`The name in the address that picks the page. It is often: page`}>
             <input type="text" value={paging.param ?? ""} onChange={e => setPaging({ param: e.target.value })} />
           </Field>
           <Field label={T`First page number`} help={T`Usually 1, sometimes 0.`}>
@@ -237,7 +237,7 @@ function WebApiFields({ model, setSource }: { model: BuilderModel; setSource: (p
         </div>
       )}
       {paging.type === "next" && (
-        <Field label={T`Where the next link is`} help={T`The path of the next page's address in the answer, for example links.next.`}>
+        <Field label={T`Where the next link is`} help={T`The name in each answer that holds the address of the next page. For example: links.next`}>
           <input type="text" value={paging.path ?? ""} onChange={e => setPaging({ path: e.target.value })} />
         </Field>
       )}
@@ -255,7 +255,7 @@ function WebApiFields({ model, setSource }: { model: BuilderModel; setSource: (p
         <>
           <Field
             label={T`Key goes in`}
-            help={T`The name the key is sent under. With Authorization the key is sent as a Bearer key.`}
+            help={T`The name the service expects the key under. Most services use Authorization, which is used when this is empty.`}
           >
             <input
               type="text"

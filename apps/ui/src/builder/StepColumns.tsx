@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react"
 import type { RecipeColumn } from "@data-integrator/definitions"
 import { cellText, Field, StepNav } from "./shared.js"
-import { BuilderModel, ID_PATTERN, suggestId, writeModesOf } from "./useBuilderDraft.js"
+import { BuilderModel, ID_PATTERN, readCleanupChanged, suggestId, usePending, writeModesOf } from "./useBuilderDraft.js"
 
 type ColumnType = RecipeColumn["type"]
 
@@ -52,13 +52,17 @@ interface Row {
 
 /** The columns step. */
 export function StepColumns({ model }: { model: BuilderModel }) {
-  const { work, inspected } = model
+  const { work, inspected, inspectedCleanup } = model
   const [rows, setRows] = useState<Row[] | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
+  // The two columns dates across the columns become; the server adds them to the table
+  const unpivot = work.cleanup.unpivot
+  const made = unpivot ? [unpivot.dateColumnId, unpivot.valueColumnId] : []
 
-  // On a resumed draft the source has not been read in this visit yet
+  // Read the source when this visit has not yet, or when the clean-up changed which columns it has
   useEffect(() => {
-    if (!inspected && !model.busy) void model.inspect()
+    const stale = !inspected || !inspectedCleanup || readCleanupChanged(inspectedCleanup, work.cleanup)
+    if (stale && !model.busy) void model.inspect()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -67,9 +71,11 @@ export function StepColumns({ model }: { model: BuilderModel }) {
     if (!inspected) return
     const chosen = new Map(work.columns.map(c => [c.from, c]))
     const fresh = work.columns.length === 0
-    const ids = uniqueIds(inspected.columns.map(c => c.name))
+    const made = inspectedCleanup?.unpivot ? [inspectedCleanup.unpivot.dateColumnId, inspectedCleanup.unpivot.valueColumnId] : []
+    const listed = inspected.columns.filter(c => !made.includes(c.name))
+    const ids = uniqueIds(listed.map(c => c.name))
     setRows(
-      inspected.columns.map((c, i) => {
+      listed.map((c, i) => {
         const col = chosen.get(c.name)
         return {
           from: c.name,
@@ -84,7 +90,7 @@ export function StepColumns({ model }: { model: BuilderModel }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inspected])
 
-  const missingFromSource = inspected ? work.columns.filter(c => !inspected.columns.some(i => i.name === c.from)) : []
+  const missingFromSource = inspected && rows ? work.columns.filter(c => !rows.some(r => r.from === c.from)) : []
 
   const setRow = (index: number, patch: Partial<Row>) =>
     setRows(rs => rs && rs.map((r, i) => (i === index ? { ...r, ...patch } : r)))
@@ -97,6 +103,7 @@ export function StepColumns({ model }: { model: BuilderModel }) {
     ...(r.type === "number" && r.unit.trim() ? { unit: r.unit.trim() } : {})
   }))
   const modes = writeModesOf(work.connector)
+  usePending(model, () => (rows ? { columns } : {}))
 
   /** What is wrong with the choices, in plain words; null when they are fine. */
   function check(): string | null {
@@ -107,10 +114,14 @@ export function StepColumns({ model }: { model: BuilderModel }) {
       }
     }
     const ids = columns.flatMap(c => (c.type === "place" ? [c.id, `${c.id}_code`] : [c.id]))
+    const clash = made.find(id => ids.includes(id))
+    if (clash) {
+      return T`"${clash}" is the name of a column made by clean-up. Give this column another name, or rename that one on the Clean-up step.`
+    }
     const twice = ids.find((id, i) => ids.indexOf(id) !== i)
     if (twice) return T`Two columns are called "${twice}". Give each column its own name.`
     if (columns.filter(c => c.type === "place").length > 1) return T`Only one column can be a place.`
-    if (work.writeMode === "merge" && !columns.some(c => c.id === work.mergeKey)) {
+    if (work.writeMode === "merge" && !columns.some(c => c.id === work.mergeKey) && !made.includes(work.mergeKey ?? "")) {
       return T`Choose the column that identifies each row.`
     }
     return null
@@ -141,7 +152,7 @@ export function StepColumns({ model }: { model: BuilderModel }) {
       ) : (
         <>
           <p className="dim">
-            {T`Found ${inspected.columns.length} columns in ${inspected.rows} rows read. Untick the columns you do not need, give each a name for the table, and say what kind of values it holds.`}
+            {T`Found ${rows.length} columns in ${inspected.rows} rows read. Untick the columns you do not need, give each a name for the table, and say what kind of values it holds.`}
           </p>
           {missingFromSource.length > 0 && (
             <p className="error">
@@ -217,6 +228,11 @@ export function StepColumns({ model }: { model: BuilderModel }) {
           <p className="dim">
             {T`Names in the table use lowercase letters, digits and underscores. A place column also gets a second column with the place code.`}
           </p>
+          {unpivot && (
+            <p>
+              {T`Made by clean-up from the date columns: ${unpivot.dateColumnId} (date) and ${unpivot.valueColumnId} (number).`}
+            </p>
+          )}
 
           {modes.includes("merge") && (
             <fieldset className="builder-choices compact">
@@ -240,7 +256,12 @@ export function StepColumns({ model }: { model: BuilderModel }) {
                     <option value="">{T`Choose a column`}</option>
                     {columns.map(c => (
                       <option key={c.id} value={c.id}>
-                        {c.id}
+                        {c.from}
+                      </option>
+                    ))}
+                    {made.map(id => (
+                      <option key={id} value={id}>
+                        {id}
                       </option>
                     ))}
                   </select>
@@ -251,7 +272,7 @@ export function StepColumns({ model }: { model: BuilderModel }) {
 
           {problem && <p className="error">{problem}</p>}
           <div className="builder-nav-extra">
-            <button className="secondary" disabled={model.busy} onClick={() => void model.inspect()}>
+            <button className="secondary" disabled={model.busy} onClick={() => void model.inspect({ columns })}>
               {T`Read the source again`}
             </button>
           </div>

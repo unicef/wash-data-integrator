@@ -13,7 +13,7 @@ import {
 } from "../api.js"
 import { localizeData } from "../localization.js"
 import { cellText, Field, StepNav } from "./shared.js"
-import { BuilderModel, Places } from "./useBuilderDraft.js"
+import { BuilderModel, Places, usePending, Work } from "./useBuilderDraft.js"
 
 /** The choice value for "Leave unmatched". */
 const UNMATCHED = ""
@@ -48,7 +48,8 @@ export function StepPlaces({ model }: { model: BuilderModel }) {
       r => setTables(r.tables),
       err => setTablesError(err instanceof Error ? err.message : String(err))
     )
-  }, [placeColumn])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placeColumn?.id])
 
   const chosenTable = useMemo(() => tables?.find(t => t.tableId === table), [tables, table])
 
@@ -133,9 +134,15 @@ export function StepPlaces({ model }: { model: BuilderModel }) {
     await model.goTo("preview", { places: places(matchesToSave()) })
   }
 
+  /** The table choice and matches so far, kept when leaving the step another way than Next. */
+  const kept = (): Partial<Work> =>
+    placeColumn && table && nameColumn && codeColumn
+      ? { places: places(suggestions ? matchesToSave() : work.places?.table === table ? work.places.matches : {}) }
+      : {}
+  usePending(model, kept)
+
   async function back() {
-    const keep = placeColumn && table && nameColumn && codeColumn
-    await model.goTo("cleanup", keep ? { places: places(suggestions ? matchesToSave() : work.places?.table === table ? work.places.matches : {}) } : {})
+    await model.goTo("cleanup", kept())
   }
 
   const matchedCount = suggestions ? suggestions.filter(s => (choices[s.name] ?? UNMATCHED) !== UNMATCHED).length : 0
@@ -148,7 +155,7 @@ export function StepPlaces({ model }: { model: BuilderModel }) {
       ) : (
         <>
           <p className="dim">
-            {T`The names in ${placeColumn.id} are matched to the places in a table that is already here, such as a country's regions or districts. Each row then gets the place code too.`}
+            {T`The names in ${placeColumn.from} are matched to the places in a table that is already here, such as a country's regions or districts. Each row then gets the place code too.`}
           </p>
           {tablesError && <div className="error">{tablesError}</div>}
           {tables === null && !tablesError && <p role="status">{T`Loading…`}</p>}

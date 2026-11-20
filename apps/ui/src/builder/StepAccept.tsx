@@ -92,11 +92,18 @@ export function StepAccept({ model }: { model: BuilderModel }) {
           <code>{work.id}</code>
         </dd>
         <dt>{T`Columns`}</dt>
-        <dd>{work.columns.map(c => c.id).join(", ")}</dd>
+        <dd>
+          {[
+            ...work.columns.map(c => c.from),
+            ...(work.cleanup.unpivot ? [work.cleanup.unpivot.dateColumnId, work.cleanup.unpivot.valueColumnId] : [])
+          ].join(", ")}
+        </dd>
         {work.places && (
           <>
             <dt>{T`Places`}</dt>
-            <dd>{T`${work.places.column} matched to ${work.places.table}`}</dd>
+            <dd>
+              {T`${work.columns.find(c => c.id === work.places?.column)?.from ?? work.places.column} matched to ${work.places.table}`}
+            </dd>
           </>
         )}
         <dt>{T`Refreshes`}</dt>

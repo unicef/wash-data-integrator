@@ -8794,15 +8794,6 @@
     },
     {
       "_base": "en",
-      "en": "If the list of records sits inside the answer, give its path, for example data.items. Leave empty when the answer is the list.",
-      "fr": "If the list of records sits inside the answer, give its path, for example data.items. Leave empty when the answer is the list.",
-      "pt": "If the list of records sits inside the answer, give its path, for example data.items. Leave empty when the answer is the list.",
-      "es": "If the list of records sits inside the answer, give its path, for example data.items. Leave empty when the answer is the list.",
-      "mg": "If the list of records sits inside the answer, give its path, for example data.items. Leave empty when the answer is the list.",
-      "sw": "If the list of records sits inside the answer, give its path, for example data.items. Leave empty when the answer is the list."
-    },
-    {
-      "_base": "en",
       "en": "More than one page",
       "fr": "More than one page",
       "pt": "More than one page",
@@ -8848,24 +8839,6 @@
     },
     {
       "_base": "en",
-      "en": "Page setting name",
-      "fr": "Page setting name",
-      "pt": "Page setting name",
-      "es": "Page setting name",
-      "mg": "Page setting name",
-      "sw": "Page setting name"
-    },
-    {
-      "_base": "en",
-      "en": "The name in the address that picks the page, often page.",
-      "fr": "The name in the address that picks the page, often page.",
-      "pt": "The name in the address that picks the page, often page.",
-      "es": "The name in the address that picks the page, often page.",
-      "mg": "The name in the address that picks the page, often page.",
-      "sw": "The name in the address that picks the page, often page."
-    },
-    {
-      "_base": "en",
       "en": "First page number",
       "fr": "First page number",
       "pt": "First page number",
@@ -8890,15 +8863,6 @@
       "es": "Where the next link is",
       "mg": "Where the next link is",
       "sw": "Where the next link is"
-    },
-    {
-      "_base": "en",
-      "en": "The path of the next page's address in the answer, for example links.next.",
-      "fr": "The path of the next page's address in the answer, for example links.next.",
-      "pt": "The path of the next page's address in the answer, for example links.next.",
-      "es": "The path of the next page's address in the answer, for example links.next.",
-      "mg": "The path of the next page's address in the answer, for example links.next.",
-      "sw": "The path of the next page's address in the answer, for example links.next."
     },
     {
       "_base": "en",
@@ -8935,15 +8899,6 @@
       "es": "Key goes in",
       "mg": "Key goes in",
       "sw": "Key goes in"
-    },
-    {
-      "_base": "en",
-      "en": "The name the key is sent under. With Authorization the key is sent as a Bearer key.",
-      "fr": "The name the key is sent under. With Authorization the key is sent as a Bearer key.",
-      "pt": "The name the key is sent under. With Authorization the key is sent as a Bearer key.",
-      "es": "The name the key is sent under. With Authorization the key is sent as a Bearer key.",
-      "mg": "The name the key is sent under. With Authorization the key is sent as a Bearer key.",
-      "sw": "The name the key is sent under. With Authorization the key is sent as a Bearer key."
     },
     {
       "_base": "en",
@@ -9082,39 +9037,12 @@
     },
     {
       "_base": "en",
-      "en": "ArcGIS feature service",
-      "fr": "ArcGIS feature service",
-      "pt": "ArcGIS feature service",
-      "es": "ArcGIS feature service",
-      "mg": "ArcGIS feature service",
-      "sw": "ArcGIS feature service"
-    },
-    {
-      "_base": "en",
-      "en": "Web API (JSON)",
-      "fr": "Web API (JSON)",
-      "pt": "Web API (JSON)",
-      "es": "Web API (JSON)",
-      "mg": "Web API (JSON)",
-      "sw": "Web API (JSON)"
-    },
-    {
-      "_base": "en",
       "en": "Uploaded file",
       "fr": "Uploaded file",
       "pt": "Uploaded file",
       "es": "Uploaded file",
       "mg": "Uploaded file",
       "sw": "Uploaded file"
-    },
-    {
-      "_base": "en",
-      "en": "Pushed data (webhook)",
-      "fr": "Pushed data (webhook)",
-      "pt": "Pushed data (webhook)",
-      "es": "Pushed data (webhook)",
-      "mg": "Pushed data (webhook)",
-      "sw": "Pushed data (webhook)"
     },
     {
       "_base": "en",
@@ -9142,15 +9070,6 @@
       "es": "A map layer published on ArcGIS Online or an ArcGIS server.",
       "mg": "A map layer published on ArcGIS Online or an ArcGIS server.",
       "sw": "A map layer published on ArcGIS Online or an ArcGIS server."
-    },
-    {
-      "_base": "en",
-      "en": "A web address that answers with records in JSON.",
-      "fr": "A web address that answers with records in JSON.",
-      "pt": "A web address that answers with records in JSON.",
-      "es": "A web address that answers with records in JSON.",
-      "mg": "A web address that answers with records in JSON.",
-      "sw": "A web address that answers with records in JSON."
     },
     {
       "_base": "en",
@@ -9196,6 +9115,123 @@
       "es": "Add a data source step by step, without code or AI",
       "mg": "Add a data source step by step, without code or AI",
       "sw": "Add a data source step by step, without code or AI"
+    },
+    {
+      "_base": "en",
+      "en": "Another column is already called \"{0}\". Give the date or value column another name.",
+      "fr": "Another column is already called \"{0}\". Give the date or value column another name.",
+      "pt": "Another column is already called \"{0}\". Give the date or value column another name.",
+      "es": "Another column is already called \"{0}\". Give the date or value column another name.",
+      "mg": "Another column is already called \"{0}\". Give the date or value column another name.",
+      "sw": "Another column is already called \"{0}\". Give the date or value column another name."
+    },
+    {
+      "_base": "en",
+      "en": "\"{0}\" is the name of a column made by clean-up. Give this column another name, or rename that one on the Clean-up step.",
+      "fr": "\"{0}\" is the name of a column made by clean-up. Give this column another name, or rename that one on the Clean-up step.",
+      "pt": "\"{0}\" is the name of a column made by clean-up. Give this column another name, or rename that one on the Clean-up step.",
+      "es": "\"{0}\" is the name of a column made by clean-up. Give this column another name, or rename that one on the Clean-up step.",
+      "mg": "\"{0}\" is the name of a column made by clean-up. Give this column another name, or rename that one on the Clean-up step.",
+      "sw": "\"{0}\" is the name of a column made by clean-up. Give this column another name, or rename that one on the Clean-up step."
+    },
+    {
+      "_base": "en",
+      "en": "Made by clean-up from the date columns: {0} (date) and {1} (number).",
+      "fr": "Made by clean-up from the date columns: {0} (date) and {1} (number).",
+      "pt": "Made by clean-up from the date columns: {0} (date) and {1} (number).",
+      "es": "Made by clean-up from the date columns: {0} (date) and {1} (number).",
+      "mg": "Made by clean-up from the date columns: {0} (date) and {1} (number).",
+      "sw": "Made by clean-up from the date columns: {0} (date) and {1} (number)."
+    },
+    {
+      "_base": "en",
+      "en": "Leave empty when the answer is just the list of records. If the list sits inside the answer under a name, give that name. For example: data.items",
+      "fr": "Leave empty when the answer is just the list of records. If the list sits inside the answer under a name, give that name. For example: data.items",
+      "pt": "Leave empty when the answer is just the list of records. If the list sits inside the answer under a name, give that name. For example: data.items",
+      "es": "Leave empty when the answer is just the list of records. If the list sits inside the answer under a name, give that name. For example: data.items",
+      "mg": "Leave empty when the answer is just the list of records. If the list sits inside the answer under a name, give that name. For example: data.items",
+      "sw": "Leave empty when the answer is just the list of records. If the list sits inside the answer under a name, give that name. For example: data.items"
+    },
+    {
+      "_base": "en",
+      "en": "Name of the page number setting",
+      "fr": "Name of the page number setting",
+      "pt": "Name of the page number setting",
+      "es": "Name of the page number setting",
+      "mg": "Name of the page number setting",
+      "sw": "Name of the page number setting"
+    },
+    {
+      "_base": "en",
+      "en": "The name in the address that picks the page. It is often: page",
+      "fr": "The name in the address that picks the page. It is often: page",
+      "pt": "The name in the address that picks the page. It is often: page",
+      "es": "The name in the address that picks the page. It is often: page",
+      "mg": "The name in the address that picks the page. It is often: page",
+      "sw": "The name in the address that picks the page. It is often: page"
+    },
+    {
+      "_base": "en",
+      "en": "The name in each answer that holds the address of the next page. For example: links.next",
+      "fr": "The name in each answer that holds the address of the next page. For example: links.next",
+      "pt": "The name in each answer that holds the address of the next page. For example: links.next",
+      "es": "The name in each answer that holds the address of the next page. For example: links.next",
+      "mg": "The name in each answer that holds the address of the next page. For example: links.next",
+      "sw": "The name in each answer that holds the address of the next page. For example: links.next"
+    },
+    {
+      "_base": "en",
+      "en": "The name the service expects the key under. Most services use Authorization, which is used when this is empty.",
+      "fr": "The name the service expects the key under. Most services use Authorization, which is used when this is empty.",
+      "pt": "The name the service expects the key under. Most services use Authorization, which is used when this is empty.",
+      "es": "The name the service expects the key under. Most services use Authorization, which is used when this is empty.",
+      "mg": "The name the service expects the key under. Most services use Authorization, which is used when this is empty.",
+      "sw": "The name the service expects the key under. Most services use Authorization, which is used when this is empty."
+    },
+    {
+      "_base": "en",
+      "en": "ArcGIS map layer",
+      "fr": "ArcGIS map layer",
+      "pt": "ArcGIS map layer",
+      "es": "ArcGIS map layer",
+      "mg": "ArcGIS map layer",
+      "sw": "ArcGIS map layer"
+    },
+    {
+      "_base": "en",
+      "en": "Web service (API)",
+      "fr": "Web service (API)",
+      "pt": "Web service (API)",
+      "es": "Web service (API)",
+      "mg": "Web service (API)",
+      "sw": "Web service (API)"
+    },
+    {
+      "_base": "en",
+      "en": "Data sent by a device or system",
+      "fr": "Data sent by a device or system",
+      "pt": "Data sent by a device or system",
+      "es": "Data sent by a device or system",
+      "mg": "Data sent by a device or system",
+      "sw": "Data sent by a device or system"
+    },
+    {
+      "_base": "en",
+      "en": "An online service that gives its records when its web address is opened.",
+      "fr": "An online service that gives its records when its web address is opened.",
+      "pt": "An online service that gives its records when its web address is opened.",
+      "es": "An online service that gives its records when its web address is opened.",
+      "mg": "An online service that gives its records when its web address is opened.",
+      "sw": "An online service that gives its records when its web address is opened."
+    },
+    {
+      "_base": "en",
+      "en": "Leave this page? Changes on this step are not saved yet.",
+      "fr": "Leave this page? Changes on this step are not saved yet.",
+      "pt": "Leave this page? Changes on this step are not saved yet.",
+      "es": "Leave this page? Changes on this step are not saved yet.",
+      "mg": "Leave this page? Changes on this step are not saved yet.",
+      "sw": "Leave this page? Changes on this step are not saved yet."
     }
   ],
   "unused": [

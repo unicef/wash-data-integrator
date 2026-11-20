@@ -13,6 +13,7 @@ import {
   saveBuilderDraft
 } from "../api.js"
 import { currentLocale, localizeData } from "../localization.js"
+import { setLeaveGuard } from "../navGuard.js"
 
 /** The builder's steps, in order. */
 export const STEPS = ["source", "columns", "cleanup", "places", "preview", "schedule", "accept"] as const
@@ -23,9 +24,6 @@ export const CONNECTORS: ConnectorId[] = ["sheet_link", "upload", "hdx", "arcgis
 
 /** Connector version the builder writes (the server's registry is at 1 for all). */
 const CONNECTOR_VERSION = 1
-
-/** Stand-in column sent while reading a source whose columns are not chosen yet (the server wants one). */
-const INSPECT_PLACEHOLDER = "inspect_placeholder"
 
 /** The same pattern the server checks table and column ids against. */
 export const ID_PATTERN = /^[a-z][a-z0-9_]{0,62}$/
@@ -52,6 +50,11 @@ export interface Work {
   mergeKey: string | null
   /** Schedule; null when it only runs on demand */
   cron: string | null
+  /**
+   * True once the schedule step was saved. Until then no trigger is saved,
+   * so a new draft (no trigger) can be told from "Manual only" (empty trigger).
+   */
+  scheduleSet: boolean
   provider: string
   license: string
   limitations: string
@@ -75,10 +78,10 @@ export function connectorLabel(id: ConnectorId): string {
   switch (id) {
     case "sheet_link": return T`Spreadsheet or CSV at a link`
     case "hdx": return T`HDX dataset`
-    case "arcgis": return T`ArcGIS feature service`
-    case "web_api": return T`Web API (JSON)`
+    case "arcgis": return T`ArcGIS map layer`
+    case "web_api": return T`Web service (API)`
     case "upload": return T`Uploaded file`
-    case "webhook": return T`Pushed data (webhook)`
+    case "webhook": return T`Data sent by a device or system`
   }
 }
 
@@ -88,7 +91,7 @@ export function connectorHelp(id: ConnectorId): string {
     case "sheet_link": return T`A CSV or Excel file anyone can open from a web address, such as a shared Google Sheet.`
     case "hdx": return T`A file from a dataset on the Humanitarian Data Exchange.`
     case "arcgis": return T`A map layer published on ArcGIS Online or an ArcGIS server.`
-    case "web_api": return T`A web address that answers with records in JSON.`
+    case "web_api": return T`An online service that gives its records when its web address is opened.`
     case "upload": return T`A CSV or Excel file you upload here. Uploading a new file refreshes the data.`
     case "webhook": return T`Another system sends the data here as it happens, for example a sensor.`
   }
@@ -134,24 +137,21 @@ function fromState(state: BuilderState): Work {
     name: nameText(state.name),
     connector: state.recipe?.connector ?? null,
     source: config?.source ?? {},
-    columns: (config?.columns ?? []).filter(c => c.id !== INSPECT_PLACEHOLDER),
+    columns: config?.columns ?? [],
     cleanup: config?.cleanup ?? {},
     places: config?.places ?? null,
     writeMode: config?.writeMode ?? "replace",
     mergeKey: config?.mergeKey ?? null,
     cron: state.trigger?.cron ?? null,
+    scheduleSet: state.trigger !== undefined,
     provider: state.source?.provider ?? "",
     license: state.source?.license ?? "",
     limitations: nameText(state.source?.limitations)
   }
 }
 
-/**
- * The steps' working copy as the full saved state. With forInspect, an empty
- * column list gets a stand-in and unpivoting is left out, so the source is
- * read with its own columns.
- */
-export function toState(work: Work, forInspect = false): BuilderState {
+/** The steps' working copy as the full saved state. */
+export function toState(work: Work): BuilderState {
   const state: BuilderState = { step: work.step }
   if (work.id) state.id = work.id
   if (work.name.trim()) state.name = localized(work.name.trim())
@@ -163,24 +163,35 @@ export function toState(work: Work, forInspect = false): BuilderState {
     ...(work.license.trim() ? { license: work.license.trim() } : {}),
     ...(work.limitations.trim() ? { limitations: localized(work.limitations.trim()) } : {})
   }
-  state.trigger = work.cron && work.connector !== "upload" && work.connector !== "webhook" ? { cron: work.cron } : {}
+  if (work.scheduleSet) {
+    state.trigger = work.cron && work.connector !== "upload" && work.connector !== "webhook" ? { cron: work.cron } : {}
+  }
   if (work.connector) {
     const modes = writeModesOf(work.connector)
-    let writeMode = modes.includes(work.writeMode) ? work.writeMode : modes[0]
-    let columns = work.columns
-    let cleanup = work.cleanup
-    if (forInspect) {
-      if (columns.length === 0) columns = [{ from: INSPECT_PLACEHOLDER, id: INSPECT_PLACEHOLDER, type: "text" }]
-      if (writeMode === "merge") writeMode = modes[0]
-      const { unpivot: _unpivot, ...rest } = cleanup
-      cleanup = rest
-    }
-    const config: RecipeConfig = { source: work.source, columns, cleanup, writeMode }
+    const writeMode = modes.includes(work.writeMode) ? work.writeMode : modes[0]
+    const config: RecipeConfig = { source: work.source, columns: work.columns, cleanup: work.cleanup, writeMode }
     if (writeMode === "merge" && work.mergeKey) config.mergeKey = work.mergeKey
     if (work.places) config.places = work.places
     state.recipe = { connector: work.connector, connectorVersion: CONNECTOR_VERSION, config }
   }
   return state
+}
+
+/** The clean-up settings a read of the source used; they decide which columns it lists. */
+export interface ReadCleanup {
+  skipRows?: number
+  headerRow?: number
+  unpivot?: Cleanup["unpivot"]
+}
+
+/** The read-relevant part of a clean-up. */
+export function readCleanupOf(cleanup: Cleanup): ReadCleanup {
+  return { skipRows: cleanup.skipRows, headerRow: cleanup.headerRow, unpivot: cleanup.unpivot }
+}
+
+/** True when two clean-ups would make a read list other columns. */
+export function readCleanupChanged(a: ReadCleanup, b: ReadCleanup): boolean {
+  return JSON.stringify(readCleanupOf(a as Cleanup)) !== JSON.stringify(readCleanupOf(b as Cleanup))
 }
 
 /** The builder's state and the calls the steps make. */
@@ -192,14 +203,21 @@ export interface BuilderModel {
   update: (patch: Partial<Work>) => void
   /** Saves the working copy with the patch; resolves to what was saved */
   save: (patch?: Partial<Work>) => Promise<Work>
-  /** Saves the patch and moves to another step */
+  /** Saves the current step's edits and the patch, and moves to another step */
   goTo: (step: StepId, patch?: Partial<Work>) => Promise<void>
-  /** Saves for reading and reads the source; null when it failed (see error) */
+  /** Saves the current state and reads the source; null when it failed (see error) */
   inspect: (patch?: Partial<Work>) => Promise<BuilderInspect | null>
   /** Last read of the source, kept in memory */
   inspected: BuilderInspect | null
-  /** Skip and header rows the last read used */
-  inspectedCleanup: { skipRows?: number; headerRow?: number } | null
+  /** Clean-up the last read used */
+  inspectedCleanup: ReadCleanup | null
+  /**
+   * A step with edits held in its own fields registers what it would save, so
+   * the step list and the leave warning see those edits too; null clears it.
+   */
+  setPending: (owner: object, collect: () => Partial<Work>) => void
+  /** Clears the edits a step registered, if they are still its own */
+  clearPending: (owner: object) => void
   /** True while saving or reading */
   busy: boolean
   /** Last failure, as the server worded it */
@@ -219,10 +237,13 @@ export function useBuilderDraft(draftId: string, isAdmin: boolean): { model: Bui
     workRef.current = next
     setWorkState(next)
   }, [])
+  // What the server holds, to tell when there are edits not saved yet
+  const savedRef = useRef<string | null>(null)
+  const pendingRef = useRef<{ owner: object; collect: () => Partial<Work> } | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   const [inspected, setInspected] = useState<BuilderInspect | null>(null)
-  const [inspectedCleanup, setInspectedCleanup] = useState<BuilderModel["inspectedCleanup"]>(null)
+  const [inspectedCleanup, setInspectedCleanup] = useState<ReadCleanup | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [uploadedName, setUploadedName] = useState<string | null>(null)
@@ -232,7 +253,10 @@ export function useBuilderDraft(draftId: string, isAdmin: boolean): { model: Bui
     setLoadError(null)
     getBuilderDraft(draftId).then(
       draft => {
-        if (!cancelled) setWork(fromState(draft.state))
+        if (cancelled) return
+        const loaded = fromState(draft.state)
+        savedRef.current = JSON.stringify(toState(loaded))
+        setWork(loaded)
       },
       err => !cancelled && setLoadError(err instanceof Error ? err.message : String(err))
     )
@@ -240,6 +264,29 @@ export function useBuilderDraft(draftId: string, isAdmin: boolean): { model: Bui
       cancelled = true
     }
   }, [draftId, attempt, setWork])
+
+  /** The working copy with the current step's own edits. */
+  const current = useCallback((): Work | null => {
+    if (!workRef.current) return null
+    return { ...workRef.current, ...(pendingRef.current?.collect() ?? {}) }
+  }, [])
+
+  // Warn before leaving the draft with edits that are not saved yet
+  useEffect(() => {
+    const unsaved = () => {
+      const now = current()
+      return now !== null && savedRef.current !== null && JSON.stringify(toState(now)) !== savedRef.current
+    }
+    setLeaveGuard(() => unsaved() && !window.confirm(T`Leave this page? Changes on this step are not saved yet.`))
+    const onUnload = (e: BeforeUnloadEvent) => {
+      if (unsaved()) e.preventDefault()
+    }
+    window.addEventListener("beforeunload", onUnload)
+    return () => {
+      setLeaveGuard(null)
+      window.removeEventListener("beforeunload", onUnload)
+    }
+  }, [current])
 
   const update = useCallback(
     (patch: Partial<Work>) => {
@@ -251,7 +298,9 @@ export function useBuilderDraft(draftId: string, isAdmin: boolean): { model: Bui
   const save = useCallback(
     async (patch: Partial<Work> = {}): Promise<Work> => {
       const next = { ...workRef.current!, ...patch }
-      await saveBuilderDraft(draftId, toState(next))
+      const state = toState(next)
+      await saveBuilderDraft(draftId, state)
+      savedRef.current = JSON.stringify(state)
       setWork(next)
       return next
     },
@@ -263,7 +312,8 @@ export function useBuilderDraft(draftId: string, isAdmin: boolean): { model: Bui
       setBusy(true)
       setError(null)
       try {
-        await save({ ...patch, step })
+        // The step's own fields first, then what the step asked to save
+        await save({ ...(pendingRef.current?.collect() ?? {}), ...patch, step })
         window.scrollTo(0, 0)
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err))
@@ -281,12 +331,13 @@ export function useBuilderDraft(draftId: string, isAdmin: boolean): { model: Bui
       setBusy(true)
       setError(null)
       try {
-        await saveBuilderDraft(draftId, toState(next, true))
+        // The server reads the saved state, so the real state is saved first
+        const state = toState(next)
+        await saveBuilderDraft(draftId, state)
+        savedRef.current = JSON.stringify(state)
         const result = await inspectBuilderDraft(draftId)
-        // Put the real state back: the stand-in column was only for reading
-        await saveBuilderDraft(draftId, toState(next))
         setInspected(result)
-        setInspectedCleanup({ skipRows: next.cleanup.skipRows, headerRow: next.cleanup.headerRow })
+        setInspectedCleanup(readCleanupOf(next.cleanup))
         return result
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err))
@@ -297,6 +348,13 @@ export function useBuilderDraft(draftId: string, isAdmin: boolean): { model: Bui
     },
     [draftId, setWork]
   )
+
+  const setPending = useCallback((owner: object, collect: () => Partial<Work>) => {
+    pendingRef.current = { owner, collect }
+  }, [])
+  const clearPending = useCallback((owner: object) => {
+    if (pendingRef.current?.owner === owner) pendingRef.current = null
+  }, [])
 
   const model: BuilderModel | null = work
     ? {
@@ -309,6 +367,8 @@ export function useBuilderDraft(draftId: string, isAdmin: boolean): { model: Bui
         inspect,
         inspected,
         inspectedCleanup,
+        setPending,
+        clearPending,
         busy,
         error,
         setError,
@@ -317,4 +377,13 @@ export function useBuilderDraft(draftId: string, isAdmin: boolean): { model: Bui
       }
     : null
   return { model, loadError, reload: () => setAttempt(n => n + 1) }
+}
+
+/** Registers a step's own edits with the model on every render, and clears them when the step closes. */
+export function usePending(model: BuilderModel, collect: () => Partial<Work>): void {
+  const owner = useRef({}).current
+  const { setPending, clearPending } = model
+  // After every render, so the latest field values are the ones collected
+  useEffect(() => setPending(owner, collect))
+  useEffect(() => () => clearPending(owner), [owner, clearPending])
 }

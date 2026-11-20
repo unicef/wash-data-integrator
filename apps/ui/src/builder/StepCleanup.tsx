@@ -4,8 +4,9 @@
  * columns into a date column and a value column.
  */
 import { useState } from "react"
+import type { RecipeColumn } from "@data-integrator/definitions"
 import { Field, StepNav } from "./shared.js"
-import { BuilderModel, Cleanup, ID_PATTERN, suggestId } from "./useBuilderDraft.js"
+import { BuilderModel, Cleanup, ID_PATTERN, readCleanupChanged, readCleanupOf, suggestId, usePending } from "./useBuilderDraft.js"
 
 type Filter = NonNullable<Cleanup["filters"]>[number]
 
@@ -15,9 +16,30 @@ function count(value: string): number | undefined {
   return value.trim() === "" || !Number.isFinite(n) || n <= 0 ? undefined : n
 }
 
+/**
+ * The columns once this clean-up applies. They describe the table after
+ * clean-up: with dates across the columns, those columns leave the list (the
+ * date and value columns are added by the server); columns no longer turned
+ * into dates come back as numbers.
+ */
+function columnsAfter(columns: RecipeColumn[], before: Cleanup["unpivot"], after: Cleanup["unpivot"]): RecipeColumn[] {
+  const wide = new Set(after?.columns ?? [])
+  const kept = columns.filter(c => !wide.has(c.from))
+  const used = new Set(kept.map(c => c.id))
+  for (const name of before?.columns ?? []) {
+    if (wide.has(name) || kept.some(c => c.from === name)) continue
+    const base = suggestId(name, "column")
+    let id = base
+    for (let n = 2; used.has(id); n++) id = `${base}_${n}`
+    used.add(id)
+    kept.push({ from: name, id, type: "number" })
+  }
+  return kept
+}
+
 /** The clean-up step. */
 export function StepCleanup({ model }: { model: BuilderModel }) {
-  const { work, inspected } = model
+  const { work, inspected, inspectedCleanup } = model
   const [cleanup, setCleanup] = useState<Cleanup>(work.cleanup)
   const [problem, setProblem] = useState<string | null>(null)
   const set = (patch: Partial<Cleanup>) => {
@@ -25,11 +47,21 @@ export function StepCleanup({ model }: { model: BuilderModel }) {
     for (const key of Object.keys(patch) as (keyof Cleanup)[]) if (patch[key] === undefined) delete next[key]
     setCleanup(next)
   }
-  const sourceColumns = inspected?.columns.map(c => c.name) ?? work.columns.map(c => c.from)
+  // The source's own column names: a read with dates across the columns lists
+  // the date and value columns instead of the columns they came from
+  const readUnpivot = inspected ? inspectedCleanup?.unpivot : work.cleanup.unpivot
+  const sourceColumns = [
+    ...(inspected?.columns.map(c => c.name) ?? work.columns.map(c => c.from)).filter(
+      name => !readUnpivot || (name !== readUnpivot.dateColumnId && name !== readUnpivot.valueColumnId)
+    ),
+    ...(readUnpivot?.columns ?? [])
+  ].filter((name, i, all) => all.indexOf(name) === i)
   const filters = cleanup.filters ?? []
   const setFilter = (index: number, patch: Partial<Filter>) =>
     set({ filters: filters.map((f, i) => (i === index ? { ...f, ...patch } : f)) })
   const unpivot = cleanup.unpivot
+  const patch = () => ({ cleanup, columns: columnsAfter(work.columns, work.cleanup.unpivot, cleanup.unpivot) })
+  usePending(model, patch)
 
   /** What is wrong, in plain words; null when fine. */
   function check(): string | null {
@@ -42,6 +74,9 @@ export function StepCleanup({ model }: { model: BuilderModel }) {
         }
       }
       if (unpivot.dateColumnId === unpivot.valueColumnId) return T`The date column and the value column need different names.`
+      const taken = patch().columns.flatMap(c => (c.type === "place" ? [c.id, `${c.id}_code`] : [c.id]))
+      const clash = [unpivot.dateColumnId, unpivot.valueColumnId].find(id => taken.includes(id))
+      if (clash) return T`Another column is already called "${clash}". Give the date or value column another name.`
     }
     return null
   }
@@ -50,27 +85,14 @@ export function StepCleanup({ model }: { model: BuilderModel }) {
     const why = check()
     setProblem(why)
     if (why) return
-    // The server reads the wide columns from the column list, so each must be kept
-    let columns = work.columns
-    if (unpivot) {
-      const used = new Set(columns.map(c => c.id))
-      for (const name of unpivot.columns) {
-        if (columns.some(c => c.from === name)) continue
-        const base = suggestId(name, "column")
-        let id = base
-        for (let n = 2; used.has(id); n++) id = `${base}_${n}`
-        used.add(id)
-        columns = [...columns, { from: name, id, type: "number" }]
-      }
-    }
-    // Other rows above the table give other column names: show them on the Columns step
-    const base = model.inspectedCleanup ?? { skipRows: work.cleanup.skipRows, headerRow: work.cleanup.headerRow }
-    if (base.skipRows !== cleanup.skipRows || base.headerRow !== cleanup.headerRow) {
-      const result = await model.inspect({ cleanup, columns })
+    // Other rows above the table, or dates across the columns, give other columns: show them on the Columns step
+    const base = inspectedCleanup ?? readCleanupOf(work.cleanup)
+    if (readCleanupChanged(base, cleanup)) {
+      const result = await model.inspect(patch())
       if (result) await model.goTo("columns")
       return
     }
-    await model.goTo("places", { cleanup, columns })
+    await model.goTo("places", patch())
   }
 
   return (
@@ -157,7 +179,7 @@ export function StepCleanup({ model }: { model: BuilderModel }) {
       )}
 
       {problem && <p className="error">{problem}</p>}
-      <StepNav model={model} onBack={() => void model.goTo("columns", { cleanup })} onNext={() => void next()} />
+      <StepNav model={model} onBack={() => void model.goTo("columns", patch())} onNext={() => void next()} />
     </section>
   )
 }
