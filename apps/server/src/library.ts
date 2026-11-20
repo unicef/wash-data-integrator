@@ -317,6 +317,45 @@ export async function applyConnectorUpdate(
 }
 
 /**
+ * Stores a definition for approval: a new proposed entry, or the pending
+ * version of an approved one (a proposed or rejected entry is replaced and
+ * set back to proposed). One atomic upsert; never changes an approved definition.
+ */
+async function upsertBuiltDefinition(
+  pool: pg.Pool,
+  id: string,
+  definition: Record<string, unknown>,
+  userId: string
+): Promise<{ rows: { status: "proposed" | "approved"; pending: boolean }[] }> {
+  return pool.query(
+    `INSERT INTO app.built_library_entries AS e (id, definition, status, proposed_by, proposed_at)
+     VALUES ($1, $2, 'proposed', $3, now())
+     ON CONFLICT (id) DO UPDATE SET
+       definition = CASE WHEN e.status = 'approved' THEN e.definition ELSE EXCLUDED.definition END,
+       pending_definition = CASE WHEN e.status = 'approved' THEN EXCLUDED.definition ELSE NULL END,
+       approved_by = CASE WHEN e.status = 'approved' THEN e.approved_by ELSE NULL END,
+       decided_at = CASE WHEN e.status = 'approved' THEN e.decided_at ELSE NULL END,
+       note = CASE WHEN e.status = 'approved' THEN e.note ELSE NULL END,
+       status = CASE WHEN e.status = 'approved' THEN 'approved' ELSE 'proposed' END,
+       proposed_by = EXCLUDED.proposed_by,
+       proposed_at = EXCLUDED.proposed_at
+     RETURNING status, pending_definition IS NOT NULL AS pending`,
+    [id, JSON.stringify(definition), userId]
+  )
+}
+
+/** Throws a 400 LibraryError when a stored or shared definition has no valid recipe. */
+function assertValidRecipe(definition: Record<string, unknown>): void {
+  const recipe = definition.recipe as Recipe | undefined
+  if (!recipe || typeof recipe !== "object") throw new LibraryError(400, "The entry has no recipe.")
+  try {
+    validateRecipe(recipe)
+  } catch (err) {
+    throw new LibraryError(400, err instanceof Error ? err.message : String(err))
+  }
+}
+
+/**
  * Proposes an installed builder source for the library, as its definition
  * without the deployment-owned fields and without code (secrets travel as
  * names only). A proposal for an approved entry waits as its pending version.
@@ -342,21 +381,7 @@ export async function proposeBuiltEntry(
   }
   const proposed: Record<string, unknown> = { ...installed }
   for (const field of [...DEPLOYMENT_FIELDS, "code"]) delete proposed[field]
-  const result = await pool.query(
-    `INSERT INTO app.built_library_entries AS e (id, definition, status, proposed_by, proposed_at)
-     VALUES ($1, $2, 'proposed', $3, now())
-     ON CONFLICT (id) DO UPDATE SET
-       definition = CASE WHEN e.status = 'approved' THEN e.definition ELSE EXCLUDED.definition END,
-       pending_definition = CASE WHEN e.status = 'approved' THEN EXCLUDED.definition ELSE NULL END,
-       approved_by = CASE WHEN e.status = 'approved' THEN e.approved_by ELSE NULL END,
-       decided_at = CASE WHEN e.status = 'approved' THEN e.decided_at ELSE NULL END,
-       note = CASE WHEN e.status = 'approved' THEN e.note ELSE NULL END,
-       status = CASE WHEN e.status = 'approved' THEN 'approved' ELSE 'proposed' END,
-       proposed_by = EXCLUDED.proposed_by,
-       proposed_at = EXCLUDED.proposed_at
-     RETURNING status, pending_definition IS NOT NULL AS pending`,
-    [integrationId, JSON.stringify(proposed), userId]
-  )
+  const result = await upsertBuiltDefinition(pool, integrationId, proposed, userId)
   return { id: integrationId, status: result.rows[0].status, pending: result.rows[0].pending }
 }
 
@@ -369,6 +394,11 @@ async function nothingToDecide(pool: pg.Pool, id: string): Promise<never> {
 
 /** Approves a proposed entry, or promotes an approved entry's pending version (bumping its version). */
 export async function approveBuiltEntry(pool: pg.Pool, id: string, adminId: string): Promise<{ version: number }> {
+  const waiting = await pool.query(
+    "SELECT COALESCE(pending_definition, definition) AS definition FROM app.built_library_entries WHERE id = $1",
+    [id]
+  )
+  if (waiting.rows.length > 0) assertValidRecipe(waiting.rows[0].definition)
   const result = await pool.query(
     `UPDATE app.built_library_entries SET
        definition = COALESCE(pending_definition, definition),
@@ -412,6 +442,7 @@ export async function exportBuiltEntry(
   const row = await pool.query("SELECT definition FROM app.built_library_entries WHERE id = $1 AND status = 'approved'", [id])
   if (row.rows.length === 0) return null
   const definition: Record<string, unknown> = { ...row.rows[0].definition }
+  assertValidRecipe(definition)
   for (const field of ["code", "aoi", "settingValues"]) delete definition[field]
   return { format: ENTRY_FORMAT, version: 1, definition }
 }
@@ -438,34 +469,14 @@ export async function importBuiltEntry(
   const definition = { ...(raw as Record<string, unknown>) }
   const id = definition.id
   if (typeof id !== "string" || !ID_PATTERN.test(id)) throw new LibraryError(400, "The entry id is missing or not valid.")
-  const recipe = definition.recipe as Recipe | undefined
-  if (!recipe || typeof recipe !== "object") throw new LibraryError(400, "The file has no recipe.")
-  try {
-    validateRecipe(recipe)
-  } catch (err) {
-    throw new LibraryError(400, err instanceof Error ? err.message : String(err))
-  }
+  assertValidRecipe(definition)
   if (await shippedEntryExists(libraryPath, id)) throw new LibraryError(400, `The library already has an entry "${id}".`)
   const hand = await pool.query("SELECT definition->'recipe' IS NOT NULL AS built FROM app.integrations WHERE id = $1", [id])
   if (hand.rows.length > 0 && !hand.rows[0].built) {
     throw new LibraryError(400, `An integration "${id}" that was not made with the builder is already installed.`)
   }
-  // Deployment-owned fields never travel
-  for (const field of ["aoi", "settingValues"]) delete definition[field]
-  const result = await pool.query(
-    `INSERT INTO app.built_library_entries AS e (id, definition, status, proposed_by, proposed_at)
-     VALUES ($1, $2, 'proposed', $3, now())
-     ON CONFLICT (id) DO UPDATE SET
-       definition = CASE WHEN e.status = 'approved' THEN e.definition ELSE EXCLUDED.definition END,
-       pending_definition = CASE WHEN e.status = 'approved' THEN EXCLUDED.definition ELSE NULL END,
-       approved_by = CASE WHEN e.status = 'approved' THEN e.approved_by ELSE NULL END,
-       decided_at = CASE WHEN e.status = 'approved' THEN e.decided_at ELSE NULL END,
-       note = CASE WHEN e.status = 'approved' THEN e.note ELSE NULL END,
-       status = CASE WHEN e.status = 'approved' THEN 'approved' ELSE 'proposed' END,
-       proposed_by = EXCLUDED.proposed_by,
-       proposed_at = EXCLUDED.proposed_at
-     RETURNING status, pending_definition IS NOT NULL AS pending`,
-    [id, JSON.stringify(definition), adminId]
-  )
+  // Deployment-owned fields (aoi, trigger, limits, setting values) never travel; the schedule is the importer's
+  for (const field of [...DEPLOYMENT_FIELDS, "code"]) delete definition[field]
+  const result = await upsertBuiltDefinition(pool, id, definition, adminId)
   return { id, status: result.rows[0].status, pending: result.rows[0].pending }
 }

@@ -1165,7 +1165,14 @@ async function route(
       json(res, 403, { error: "Viewers cannot export library entries" })
       return
     }
-    const file = await exportBuiltEntry(pool, builtExportMatch[1])
+    let file
+    try {
+      file = await exportBuiltEntry(pool, builtExportMatch[1])
+    } catch (err) {
+      if (!(err instanceof LibraryError)) throw err
+      json(res, err.status, { error: err.message })
+      return
+    }
     if (!file) {
       json(res, 404, { error: "unknown library entry" })
       return
@@ -1187,6 +1194,10 @@ async function route(
       return
     }
     const body = await readJsonBody(req)
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+      json(res, 400, { error: "Expected a library entry file" })
+      return
+    }
     try {
       const result = await importBuiltEntry(pool, libraryPath, body, user.id)
       json(res, 200, result.pending ? result : { id: result.id, status: result.status })

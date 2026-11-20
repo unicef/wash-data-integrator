@@ -245,3 +245,65 @@ test("import_then_approve_then_install_reinlines_code", async () => {
   assert.equal(def.code, await connectorCode("sheet_link", libraryPath))
   assert.equal(def.recipe?.connectorVersion, 1)
 })
+
+test("import_rejects_secret_like_source_key", async () => {
+  const file = await exported("exp_cases")
+  const recipe = structuredClone(file.definition.recipe) as { config: { source: Record<string, unknown> } }
+  recipe.config.source.api_key = "VALUE"
+  const response = await post("/api/library/built/import", admin, importFile({ ...file.definition, id: "imp_secret", recipe }))
+  assert.equal(response.status, 400)
+  assert.match(((await response.json()) as { error: string }).error, /secrets store/)
+  assert.equal((await pool.query("SELECT 1 FROM app.built_library_entries WHERE id = 'imp_secret'")).rows.length, 0)
+})
+
+async function insertSecretRow(id: string, status: string, column: "definition" | "pending_definition") {
+  const file = await exported("exp_cases")
+  const recipe = structuredClone(file.definition.recipe) as { config: { source: Record<string, unknown> } }
+  recipe.config.source.api_key = "VALUE"
+  const bad = JSON.stringify({ ...file.definition, id, recipe })
+  if (column === "definition") {
+    await pool.query("INSERT INTO app.built_library_entries (id, definition, status) VALUES ($1, $2, $3)", [id, bad, status])
+  } else {
+    await pool.query(
+      "INSERT INTO app.built_library_entries (id, definition, status, pending_definition) SELECT $1, definition, 'approved', $2 FROM app.built_library_entries WHERE id = 'exp_cases'",
+      [id, bad]
+    )
+  }
+}
+
+test("approve_rejects_secret_like_source_key", async () => {
+  await insertSecretRow("appr_secret", "proposed", "definition")
+  const response = await post("/api/library/built/appr_secret/approve", admin)
+  assert.equal(response.status, 400)
+  assert.match(((await response.json()) as { error: string }).error, /secrets store/)
+  assert.equal((await pool.query("SELECT status FROM app.built_library_entries WHERE id = 'appr_secret'")).rows[0].status, "proposed")
+  await insertSecretRow("appr_pending", "approved", "pending_definition")
+  assert.equal((await post("/api/library/built/appr_pending/approve", admin)).status, 400)
+})
+
+test("export_refuses_secret_like_source_key", async () => {
+  await insertSecretRow("exp_secret", "approved", "definition")
+  const response = await call("/api/library/built/exp_secret/export", editor)
+  assert.equal(response.status, 400)
+  assert.match(((await response.json()) as { error: string }).error, /secrets store/)
+})
+
+test("import_drops_trigger_and_limits", async () => {
+  const file = await exported("exp_cases")
+  const destinations = (file.definition.destinations as Record<string, unknown>[]).map(d => ({ ...d, tableId: "imp_nolimits" }))
+  const response = await post("/api/library/built/import", admin, importFile({
+    ...file.definition, id: "imp_nolimits", destinations, trigger: { cron: "* * * * *" }, limits: { maxRows: 1 }
+  }))
+  assert.equal(response.status, 200, await response.clone().text())
+  const stored = (await pool.query("SELECT definition FROM app.built_library_entries WHERE id = 'imp_nolimits'")).rows[0].definition
+  assert.equal("trigger" in stored, false)
+  assert.equal("limits" in stored, false)
+})
+
+test("import_body_must_be_an_object", async () => {
+  for (const body of [[1, 2], null, "text"]) {
+    const response = await post("/api/library/built/import", admin, body)
+    assert.equal(response.status, 400, JSON.stringify(body))
+    assert.match(((await response.json()) as { error: string }).error, /Expected a library entry file/)
+  }
+})

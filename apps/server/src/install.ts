@@ -52,6 +52,16 @@ export function definitionHash(definition: IntegrationDefinition): string {
   return createHash("sha256").update(JSON.stringify(canonicalDefinition(rest))).digest("hex")
 }
 
+/** Refuses a recipe source that carries a secret-like key: secrets live in the secrets store, never in a recipe. */
+export function assertNoSecretLikeKeys(source: unknown): void {
+  if (!source || typeof source !== "object" || Array.isArray(source)) return
+  for (const key of Object.keys(source)) {
+    if (/(key|token|password|secret)$/i.test(key)) {
+      throw new Error(`recipe.config.source.${key} looks like a secret: secrets go in the secrets store, not the recipe`)
+    }
+  }
+}
+
 /** Structural validation beyond what the types express. Throws on violations. */
 export function validateDefinition(definition: IntegrationDefinition): void {
   const badId = (id: string) => !ID_PATTERN.test(id)
@@ -86,14 +96,7 @@ export function validateDefinition(definition: IntegrationDefinition): void {
     if (!(CONNECTOR_IDS as readonly string[]).includes(r.connector)) {
       throw new Error(`recipe has an unknown connector "${r.connector}": use ${CONNECTOR_IDS.join(", ")}`)
     }
-    const source = r.config.source
-    if (isObject(source)) {
-      for (const key of Object.keys(source)) {
-        if (/(key|token|password|secret)$/i.test(key)) {
-          throw new Error(`recipe.config.source.${key} looks like a secret: secrets go in the secrets store, not the recipe`)
-        }
-      }
-    }
+    assertNoSecretLikeKeys(r.config.source)
   }
   // The scheduler evaluates trigger.cron every minute; reject bad expressions here
   if (definition.trigger?.cron !== undefined) parseCron(definition.trigger.cron)

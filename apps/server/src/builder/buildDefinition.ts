@@ -1,5 +1,5 @@
 import { ColumnSpec, IntegrationDefinition, LocalizedString, Recipe, SourceInfo, Trigger } from "@data-integrator/definitions"
-import { ID_PATTERN } from "../install.js"
+import { assertNoSecretLikeKeys, ID_PATTERN } from "../install.js"
 import { CONNECTORS, connectorCode } from "./connectors.js"
 
 const MAX_MATCHES = 5000
@@ -30,6 +30,7 @@ export function validateRecipe(recipe: Recipe): void {
   const ids = c.columns.map((x) => x.id)
   if (new Set(ids).size !== ids.length) throw new Error("Column ids must be unique.")
 
+  assertNoSecretLikeKeys(c.source)
   const s = c.source
   const need = (field: string, label = field) => {
     if (!hasText(s[field])) throw new Error(`The source needs a ${label}.`)
