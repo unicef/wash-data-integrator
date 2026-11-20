@@ -183,6 +183,37 @@ test("edit_draft_url_host_change_drops_key", async () => {
   assert.equal(await keyRows(draftId), 0)
 })
 
+test("edit_draft_http_downgrade_drops_key", async () => {
+  const draftId = await keyedEdit("edit_key_http")
+  await withUrl(draftId, "http://data.example.org/api")
+  assert.equal(await keyRows(draftId), 0)
+})
+
+test("edit_draft_port_change_drops_key", async () => {
+  const draftId = await keyedEdit("edit_key_port")
+  await withUrl(draftId, "https://data.example.org:8443/api")
+  assert.equal(await keyRows(draftId), 0)
+  // An explicit default port is the same origin
+  const other = await keyedEdit("edit_key_port2")
+  await withUrl(other, "https://data.example.org:443/api")
+  assert.equal(await keyRows(other), 1)
+})
+
+test("inspect_and_preview_check_the_snapshot_they_run_with", async () => {
+  HOSTS["evil.example.net"] = ["93.184.215.15"]
+  const svc = new BuilderService(pool, builderOptions)
+  let n = 0
+  for (const run of [(d: any) => svc.inspect(d), (d: any) => svc.preview(d)]) {
+    const copied = await keyedEdit(`edit_snap_${++n}`)
+    // The stored row is still good; the snapshot a racing request holds points elsewhere
+    const row = (await (await call(`/api/builder/drafts/${copied}`, editor)).json()) as { id: string; state: Record<string, any> }
+    const source = { ...row.state.recipe.config.source, url: "https://evil.example.net/api" }
+    const snap = { ...row, state: { ...row.state, recipe: { ...row.state.recipe, config: { ...row.state.recipe.config, source } } } }
+    await assert.rejects(run(snap), (err: any) => err.status === 409)
+    assert.equal(await keyRows(copied), 0)
+  }
+})
+
 test("edit_draft_same_host_keeps_key", async () => {
   const draftId = await keyedEdit("edit_key_b")
   await withUrl(draftId, "https://data.example.org/other/path")
@@ -224,6 +255,23 @@ test("edit_is_refused_while_a_connector_update_is_pending_and_keeps_the_version"
   await saveDraft(draftId, { ...got.state, recipe: { ...got.state.recipe, connectorVersion: 7 } })
   const saved = (await (await call(`/api/builder/drafts/${draftId}`, editor)).json()) as { state: Record<string, any> }
   assert.equal(saved.state.recipe.connectorVersion, 1)
+})
+
+test("edit_accept_refuses_while_a_connector_update_is_pending", async () => {
+  const first = await newDraft()
+  await saveDraft(first, draftState("edit_acc_ver", "sheet_link", { url: "https://data.example.org/a.csv" }))
+  assert.equal((await accept(first)).status, 200)
+  const draftId = ((await (await edit("edit_acc_ver")).json()) as { id: string }).id
+  const real = builderOptions.connectors
+  builderOptions.connectors = { ...CONNECTORS, sheet_link: { ...CONNECTORS.sheet_link, version: 2 } }
+  try {
+    const refused = await accept(draftId)
+    assert.equal(refused.status, 409)
+    assert.match(((await refused.json()) as { error: string }).error, /Apply the connector update first/)
+    assert.equal((await pool.query("SELECT version FROM app.integrations WHERE id = 'edit_acc_ver'")).rows[0].version, 1)
+  } finally {
+    builderOptions.connectors = real
+  }
 })
 
 test("edit_accept_keeps_status_and_queues_no_run_when_paused", async () => {

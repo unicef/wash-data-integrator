@@ -178,23 +178,35 @@ export class BuilderService {
     if (state.recipe !== undefined && (typeof state.recipe !== "object" || state.recipe === null || Array.isArray(state.recipe))) {
       throw new BuilderError(400, "The recipe must be an object.")
     }
-    // The edit target is the server's: a client never sets or drops it
-    const existing = await this.pool.query("SELECT client_state FROM app.agent_sessions WHERE id = $1", [id])
-    const editing = existing.rows[0]?.client_state?.editing
-    if (typeof editing === "string") {
-      state.editing = editing
-      state.id = editing
-      if (existing.rows[0].client_state.keyCopied === true) state.keyCopied = true
-      // An edit keeps the connector version the source was installed with
-      const installed = await this.pool.query("SELECT definition->'recipe'->'connectorVersion' AS version FROM app.integrations WHERE id = $1", [editing])
-      const version = installed.rows[0]?.version
-      if (state.recipe && typeof version === "number") (state.recipe as Record<string, unknown>).connectorVersion = version
+    // The write and the key check are one step under the draft's key lock
+    const client = await this.pool.connect()
+    try {
+      await client.query("BEGIN")
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`builder-key:${id}`])
+      const existing = await client.query("SELECT client_state FROM app.agent_sessions WHERE id = $1", [id])
+      // The edit target is the server's: a client never sets or drops it
+      const editing = existing.rows[0]?.client_state?.editing
+      if (typeof editing === "string") {
+        state.editing = editing
+        state.id = editing
+        if (existing.rows[0].client_state.keyCopied === true) state.keyCopied = true
+        // An edit keeps the connector version the source was installed with
+        const installed = await client.query("SELECT definition->'recipe'->'connectorVersion' AS version FROM app.integrations WHERE id = $1", [editing])
+        const version = installed.rows[0]?.version
+        if (state.recipe && typeof version === "number") (state.recipe as Record<string, unknown>).connectorVersion = version
+      }
+      await client.query("UPDATE app.agent_sessions SET client_state = $2, updated_at = now() WHERE id = $1", [
+        id,
+        JSON.stringify(state)
+      ])
+      if (await this.dropCopiedKeyOnOriginChange(client, id, state as DraftState)) delete state.keyCopied
+      await client.query("COMMIT")
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => {})
+      throw err
+    } finally {
+      client.release()
     }
-    await this.pool.query("UPDATE app.agent_sessions SET client_state = $2, updated_at = now() WHERE id = $1", [
-      id,
-      JSON.stringify(state)
-    ])
-    await this.dropCopiedKeyOnHostChange(id)
     return state as DraftState
   }
 
@@ -238,7 +250,7 @@ export class BuilderService {
 
   /** Runs the connector in inspect mode and returns its inspect.json: columns with samples, and the row count. */
   async inspect(draft: Draft): Promise<unknown> {
-    await this.dropCopiedKeyOnHostChange(draft.id)
+    await this.dropCopiedKeyOnOriginChange(this.pool, draft.id, draft.state)
     const definition = await this.runDefinition(draft, "inspect")
     let inspected: unknown = null
     const status = await this.run(draft, definition, async outDir => {
@@ -252,7 +264,7 @@ export class BuilderService {
 
   /** Runs the connector in preview mode into the draft schema and reports the first rows and the counts. */
   async preview(draft: Draft): Promise<PreviewResult> {
-    await this.dropCopiedKeyOnHostChange(draft.id)
+    await this.dropCopiedKeyOnOriginChange(this.pool, draft.id, draft.state)
     const definition = await this.runDefinition(draft, "preview")
     const outcome = await this.run(draft, definition)
     if (outcome.status !== "succeeded") throw new BuilderError(422, `The preview failed: ${outcome.error ?? outcome.status}`)
@@ -307,28 +319,34 @@ export class BuilderService {
 
   /**
    * An edit draft keeps the installed source's copied key only while every
-   * source address (url, layerUrl) stays on the installed source's host;
-   * otherwise the key is deleted, so no other host ever receives it.
+   * source address (url, layerUrl) keeps the installed source's origin
+   * (scheme, host and port); otherwise the key is deleted, so no other
+   * address ever receives it. Checks the given state, the one a run or an
+   * install is about to use. Returns whether the key was dropped.
    */
-  private async dropCopiedKeyOnHostChange(draftId: string): Promise<void> {
-    const row = await this.pool.query("SELECT client_state FROM app.agent_sessions WHERE id = $1", [draftId])
-    const state = (row.rows[0]?.client_state ?? {}) as DraftState
-    if (!state.editing || state.keyCopied !== true) return
-    const installed = await this.pool.query("SELECT definition FROM app.integrations WHERE id = $1", [state.editing])
+  private async dropCopiedKeyOnOriginChange(
+    db: Pick<pg.PoolClient, "query">,
+    draftId: string,
+    state: DraftState
+  ): Promise<boolean> {
+    if (!state.editing || state.keyCopied !== true) return false
+    const installed = await db.query("SELECT definition FROM app.integrations WHERE id = $1", [state.editing])
     const before = (installed.rows[0]?.definition as IntegrationDefinition | undefined)?.recipe?.config?.source ?? {}
     const after = state.recipe?.config?.source ?? {}
-    const host = (value: unknown): string | null => {
+    const origin = (value: unknown): string | null => {
       if (value === undefined || value === null || value === "") return null
       try {
-        return new URL(String(value)).hostname.toLowerCase()
+        const url = new URL(String(value))
+        return url.origin === "null" ? `${url.protocol}//${url.host}` : url.origin
       } catch {
         return "invalid:" + String(value)
       }
     }
-    const same = ["url", "layerUrl"].every(field => host(after[field]) === null || host(after[field]) === host(before[field]))
-    if (same) return
-    await this.pool.query("DELETE FROM app.draft_secrets WHERE session_id = $1 AND name = $2", [draftId, KEY_NAME])
-    await this.pool.query("UPDATE app.agent_sessions SET client_state = client_state - 'keyCopied' WHERE id = $1", [draftId])
+    const same = ["url", "layerUrl"].every(field => origin(after[field]) === null || origin(after[field]) === origin(before[field]))
+    if (same) return false
+    await db.query("DELETE FROM app.draft_secrets WHERE session_id = $1 AND name = $2", [draftId, KEY_NAME])
+    await db.query(`UPDATE app.agent_sessions SET client_state = client_state - 'keyCopied' WHERE id = $1`, [draftId])
+    return true
   }
 
   /** The draft's secret names and update times, never values. */
@@ -352,7 +370,7 @@ export class BuilderService {
       held.push(draftLock)
       const fresh = await this.find(draft.id, user)
       if (!fresh) throw new BuilderError(404, "unknown draft")
-      await this.dropCopiedKeyOnHostChange(fresh.id)
+      await this.dropCopiedKeyOnOriginChange(this.pool, fresh.id, fresh.state)
       const { id, recipe } = fresh.state
       if (!id) throw new BuilderError(400, "Give the source an id before accepting it.")
       if (!recipe) throw new BuilderError(400, "Choose a connector before accepting the source.")
