@@ -116,10 +116,52 @@ export interface IntegrationDefinition {
    * and creates a new integration version. Carried over on library updates.
    */
   settingValues?: Record<string, SettingValue>
+  /**
+   * Settings of a ready-made connector, set by the no-code source builder.
+   * Absent for hand-written integrations. Holds no secrets.
+   */
+  recipe?: Recipe
   /** Single self-contained file implementing the entrypoint */
   code: string
   /** Entrypoint contract version */
   contract: 2
+}
+
+/** Ready-made connectors the source builder can configure. */
+export const CONNECTOR_IDS = ["sheet_link", "hdx", "arcgis", "web_api", "upload", "webhook"] as const
+export type ConnectorId = typeof CONNECTOR_IDS[number]
+
+/** One output column of a recipe: which source column feeds it and how it is typed. */
+export interface RecipeColumn {
+  from: string
+  id: string
+  type: "text" | "number" | "date" | "place"
+  unit?: string
+}
+
+/** Everything a connector needs to run, apart from secrets. */
+export interface RecipeConfig {
+  /** Connector-specific: may hold url, sheet, resourceId, layerUrl, recordsPath, paging, sampleMessage, auth */
+  source: Record<string, unknown>
+  columns: RecipeColumn[]
+  cleanup: {
+    skipRows?: number
+    headerRow?: number
+    filters?: { column: string; op: "equals" | "contains"; value: string }[]
+    unpivot?: { columns: string[]; dateColumnId: string; valueColumnId: string }
+  }
+  places?: { column: string; table: string; nameColumn: string; codeColumn: string; matches: Record<string, string> }
+  writeMode: "replace" | "append" | "merge"
+  mergeKey?: string
+  /** Set only on builder draft runs */
+  mode?: "preview" | "inspect"
+}
+
+/** The recipe block of a definition. */
+export interface Recipe {
+  connector: ConnectorId
+  connectorVersion: number
+  config: RecipeConfig
 }
 
 

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
 import pg from "pg"
-import { IntegrationDefinition } from "@data-integrator/definitions"
+import { IntegrationDefinition, CONNECTOR_IDS } from "@data-integrator/definitions"
 import { durationMs } from "./validation.js"
 import { ensureTable, ident } from "./destinations.js"
 import { ensureLayer } from "./catalog.js"
@@ -75,6 +75,24 @@ export function validateDefinition(definition: IntegrationDefinition): void {
       }
       if (seen.has(name)) throw new Error(`Secret ${name} is declared twice`)
       seen.add(name)
+    }
+  }
+  if (definition.recipe !== undefined) {
+    const r = definition.recipe as unknown as Record<string, unknown>
+    const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v)
+    if (!isObject(r) || typeof r.connector !== "string" || typeof r.connectorVersion !== "number" || !isObject(r.config)) {
+      throw new Error("recipe must be an object with a connector, a numeric connectorVersion and a config object")
+    }
+    if (!(CONNECTOR_IDS as readonly string[]).includes(r.connector)) {
+      throw new Error(`recipe has an unknown connector "${r.connector}": use ${CONNECTOR_IDS.join(", ")}`)
+    }
+    const source = r.config.source
+    if (isObject(source)) {
+      for (const key of Object.keys(source)) {
+        if (/(key|token|password|secret)$/i.test(key)) {
+          throw new Error(`recipe.config.source.${key} looks like a secret: secrets go in the secrets store, not the recipe`)
+        }
+      }
     }
   }
   // The scheduler evaluates trigger.cron every minute; reject bad expressions here
