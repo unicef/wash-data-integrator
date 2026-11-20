@@ -21,6 +21,10 @@ test("no mWater name in served UI text", async () => {
     path.join(ROOT, "apps/ui/index.html"),
     path.join(ROOT, "apps/ui/src/localizations.json"),
     path.join(ROOT, "apps/server/static/openapi.json"),
+    path.join(ROOT, "apps/server/src/settings.ts"),
+    path.join(ROOT, "apps/server/src/agent/assistant.ts"),
+    path.join(ROOT, "apps/server/src/agent/dashboard.ts"),
+    path.join(ROOT, "apps/server/src/agent/designer.ts"),
     ...(await walk(path.join(ROOT, "apps/ui/src")))
   ]
   const offenders: string[] = []
