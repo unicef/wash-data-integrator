@@ -229,6 +229,8 @@ export interface RunSummary {
   error: string | null
   /** Validation flags the run raised; null when none */
   flags: RunFlag[] | null
+  /** Place names a builder source could not match (first 50); null when all matched */
+  unmatched: { count: number; places: string[] } | null
 }
 
 /** One data-quality finding on a run: values outside a range rule or a column's codes. */
@@ -271,6 +273,8 @@ export interface IntegrationDetail {
   runs: RunSummary[]
   /** Stored-data stats per destination */
   destinations: DestinationStats[]
+  /** A builder source whose connector has a newer version; null otherwise */
+  connectorUpdate: { from: number; to: number } | null
 }
 
 /** The signed-in user. */
@@ -1461,6 +1465,14 @@ export interface LibraryEntry {
   status: "not_installed" | "installed" | "update_available"
   /** Installed version, when installed */
   installedVersion: number | null
+  /** Shipped with the library, or made with the source builder */
+  origin: "shipped" | "built"
+  /** Review state of a built entry (proposed ones are listed to admins only) */
+  builtStatus?: "proposed" | "approved" | "rejected"
+  /** Built entries: the installed copy differs from the approved entry */
+  changedHere?: boolean
+  /** Built entries, admins only: a new version waits for approval */
+  pendingVersion?: boolean
 }
 
 /** The browsable library with per-entry install status. */
@@ -1700,6 +1712,8 @@ export interface BuilderState {
   trigger?: Trigger
   /** Connector and its settings */
   recipe?: Recipe
+  /** Set by the server on a draft that edits an installed source; never sent by the screens */
+  editing?: string
 }
 
 /** One builder draft from GET /api/builder/drafts/:id. */
@@ -1824,4 +1838,62 @@ export function setBuilderKey(id: string, value: string): Promise<{ name: string
 /** Installs the draft's source and starts it. */
 export function acceptBuilderDraft(id: string): Promise<BuilderAccept> {
   return request(`/api/builder/drafts/${id}/accept`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })
+}
+
+/** Opens an installed builder source as a new draft; accepting it updates that source. */
+export function createBuilderDraftFromIntegration(integrationId: string): Promise<{ id: string }> {
+  return request(`/api/builder/drafts/from-integration/${integrationId}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{}"
+  })
+}
+
+/** What proposing, importing or deciding on a built entry answers. */
+export interface BuiltEntryResult {
+  id: string
+  status: "proposed" | "approved"
+  /** A new version of an approved entry waits for approval */
+  pending?: boolean
+}
+
+/** Proposes an installed builder source for the library. */
+export function proposeBuiltEntry(integrationId: string): Promise<BuiltEntryResult> {
+  return request("/api/library/built", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ integrationId })
+  })
+}
+
+/** Approves a proposed built entry (admins). */
+export function approveBuiltEntry(id: string): Promise<{ id: string; status: "approved"; version: number }> {
+  return request(`/api/library/built/${id}/approve`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })
+}
+
+/** Rejects a proposed built entry with an optional note (admins). */
+export function rejectBuiltEntry(id: string, note: string): Promise<{ id: string }> {
+  return request(`/api/library/built/${id}/reject`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ note })
+  })
+}
+
+/** Imports a shared entry file for approval (admins); the body is the parsed file. */
+export function importBuiltEntry(file: unknown): Promise<BuiltEntryResult> {
+  return request("/api/library/built/import", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(file)
+  })
+}
+
+/** Moves an installed builder source to its connector's current version. */
+export function applyConnectorUpdate(integrationId: string): Promise<{ version: number }> {
+  return request(`/api/integrations/${integrationId}/apply-connector-update`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{}"
+  })
 }

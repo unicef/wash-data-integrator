@@ -5,6 +5,27 @@ the release's notes on the repository's Releases page, and says when a release
 changes the database (applied by `deploy/update.sh`) or the runtime images
 (rebuilt with `IMAGES=1`).
 
+## Unreleased
+
+**Source builder**
+
+- A no-code source builder for editors and admins: add a source from a
+  spreadsheet or CSV link, an HDX dataset, an ArcGIS map layer, a web service,
+  an uploaded file, or data sent by a device or system, by choosing columns,
+  cleaning up, matching place names to a places table and checking a preview.
+  See `docs/Source Builder.md`.
+- Sources made this way keep a recipe in their definition. Their page offers
+  Edit in builder, Fix matches for place names a run could not match, Propose
+  for library, and an explicit connector update.
+- Library: built entries are proposed by editors and approved or rejected by
+  admins, show as Built here or Shipped, and can be exported and imported as
+  `.wash-di.json` files. An imported entry waits for approval.
+- API: the `/api/builder` draft routes, `/api/library/built` routes and
+  `apply-connector-update`; the integration view reports `connectorUpdate` and
+  each run's unmatched places.
+- Database: migration 0005 adds the built-library table (applied by
+  `deploy/update.sh`). No image rebuild needed.
+
 ## 1.0.0 (2026-10-30)
 
 First public release of the mWater Data Integrator, the reference

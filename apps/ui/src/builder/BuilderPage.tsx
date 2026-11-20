@@ -72,8 +72,12 @@ function BuilderDraftView({ draftId, isAdmin }: { draftId: string; isAdmin: bool
       </a>
       <div className="list-head">
         <div className="catalog-header">
-          <h1>{T`New source`}</h1>
-          <p>{T`Add a data source step by step. Your work is saved at each step: open this page again to go on.`}</p>
+          <h1>{model?.editing ? T`Edit source` : T`New source`}</h1>
+          <p>
+            {model?.editing
+              ? T`Change this source step by step. Saving at the last step updates it here; the schedule and other settings of the source stay as they are.`
+              : T`Add a data source step by step. Your work is saved at each step: open this page again to go on.`}
+          </p>
         </div>
       </div>
       {!model ? (

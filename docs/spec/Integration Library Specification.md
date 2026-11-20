@@ -153,6 +153,7 @@ two-letter ISO 639-1 codes).
 | `validation` | object (2.11) | no | Data quality rules evaluated on each run |
 | `settings` | map of setting id to setting (2.12) | no | Options an operator may change without editing code |
 | `settingValues` | map of setting id to value (2.12) | no | The deployment's values for declared settings |
+| `recipe` | object (2.14) | no | Settings of a ready-made connector; present on sources made with the source builder |
 | `code` | string | yes | The single self-contained code file |
 | `contract` | `2` | yes | Job contract version |
 
@@ -411,6 +412,32 @@ A validator MUST reject a definition when:
   value (2.12);
 - `contract` is not `2`, or `runtime` is not `"node"` or `"python"`.
 
+### 2.14 Recipe
+
+A recipe records how a definition was made from a ready-made connector, so the
+source can be edited again without code. The `code` of such a definition is the
+connector's code, inlined; the recipe holds everything else the connector needs.
+It holds no secrets and no code.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `connector` | `"sheet_link"`, `"hdx"`, `"arcgis"`, `"web_api"`, `"upload"`, or `"webhook"` | The connector |
+| `connectorVersion` | integer, 1 or more | Version of the connector whose code the definition carries |
+| `config.source` | object | Connector settings: `url`, `sheet`, `resourceId`, `layerUrl`, `recordsPath`, `auth` (`"none"` or `"key"`), `sampleMessage` |
+| `config.columns` | `[{ from, id, type, unit? }]` | Output columns: source column, identifier (2.1), and type `text`, `number`, `date`, or `place` |
+| `config.cleanup` | object | `skipRows`, `headerRow`, `filters` (`equals` or `contains`), `unpivot` (`columns`, `dateColumnId`, `valueColumnId`) |
+| `config.places` | object | `column`, `table`, `nameColumn`, `codeColumn`, and `matches` (source name to place code, at most 5000) |
+| `config.writeMode` | `"replace"`, `"append"`, or `"merge"` | The connector's modes; `webhook` appends, `merge` needs `config.mergeKey` |
+
+A place column writes a second column, `<id>_code`. `config.mode` (`preview`
+or `inspect`) is set only on a builder draft's scratch runs; a definition that
+carries it is refused. A `key` source declares the secret `api_key`.
+
+A connector version applies only when asked for: an installed source whose
+`connectorVersion` is behind the connector's current one is offered an update,
+which replaces `code` and `connectorVersion` and leaves everything else as
+installed.
+
 ## 3. Job contract
 
 Integration code runs as a job inside an isolated container built from the
@@ -617,6 +644,41 @@ to 3.5; the reference implementation keeps one suite per runtime image.
   `secrets` and file slots are then filled in the importing deployment.
 - **Secrets** are stored by the deployment per integration, encrypted at
   rest, and injected only into that integration's runs.
+- **Built entries** are library entries made with the source builder, kept by
+  the deployment beside the shipped ones (4.1).
+
+### 4.1 Built entries
+
+A source with a `recipe` (2.14) can be proposed as a library entry. The
+deployment stores it without `code`, `aoi`, `trigger`, `limits`, and
+`settingValues`; the code is the connector's, inlined again on install, and the
+schedule is the installing deployment's. A fresh install therefore has no
+schedule, except a `webhook` source, which runs when data arrives.
+
+An entry has a status: `proposed`, `approved`, or `rejected`. Only an admin
+moves it. Only approved entries can be installed or exported; proposed ones are
+visible to admins only. A new proposal for an approved entry waits as a pending
+version and replaces the approved one only on approval. A shipped entry always
+wins its id, and an id used by an installed integration that has no recipe is
+refused. A secret-like key in `source` makes a definition invalid on propose,
+approve, export and import.
+
+**Export format.** An approved entry is exported as a JSON document, saved as
+`<id>.wash-di.json`:
+
+```json
+{
+  "format": "wash-di-library-entry",
+  "version": 1,
+  "definition": { "id": "...", "name": {}, "recipe": {}, "...": "..." }
+}
+```
+
+`definition` is the entry without `code`, `aoi`, `trigger`, `limits`, and
+`settingValues`. An import refuses a document whose `format` or `version` is
+not the above, one that carries `code`, and one whose recipe is invalid; it
+stores the entry as `proposed` (or as the pending version of an approved
+entry) and installs nothing.
 
 ## 5. Skills
 
@@ -653,6 +715,10 @@ A **platform implementation** conforms when it:
    COG promotion and cataloging, and persistent incremental state;
 4. implements the lifecycle semantics of section 4;
 5. serves skills to its design tooling as read-only documents.
+
+A platform implementation that offers built entries (4.1) additionally
+validates recipes per 2.14, never accepts `code` in an entry file, and never
+installs an entry that is not approved.
 
 An implementation meeting these criteria runs every entry of a conforming
 library unchanged, and definitions exported from it import into any other

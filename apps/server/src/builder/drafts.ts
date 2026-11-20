@@ -22,7 +22,7 @@ import { getWebhookToken } from "../webhooks.js"
 import { queryRows } from "../queryApi.js"
 import { RasterStore } from "../rasterStore.js"
 import { cleanupScratch, draftSchema } from "../scratch.js"
-import { getDraftSecrets, listDraftSecrets, loadSecretKey, MissingSecretError, setDraftSecret, setSecret } from "../secrets.js"
+import { getDraftSecrets, getSecrets, listDraftSecrets, loadSecretKey, MissingSecretError, setDraftSecret, setSecret } from "../secrets.js"
 import { buildDefinition, validateRecipe } from "./buildDefinition.js"
 import { checkLink, Resolver } from "./linkSafety.js"
 import { suggestMatches } from "./places.js"
@@ -74,6 +74,8 @@ export interface DraftState {
   source?: SourceInfo
   trigger?: Trigger
   recipe?: Recipe
+  /** Set by the server when the draft edits an installed source: accepting updates that one integration */
+  editing?: string
 }
 
 /** One builder draft as its routes see it. */
@@ -170,11 +172,53 @@ export class BuilderService {
     if (state.recipe !== undefined && (typeof state.recipe !== "object" || state.recipe === null || Array.isArray(state.recipe))) {
       throw new BuilderError(400, "The recipe must be an object.")
     }
+    // The edit target is the server's: a client never sets or drops it
+    const existing = await this.pool.query("SELECT client_state FROM app.agent_sessions WHERE id = $1", [id])
+    const editing = existing.rows[0]?.client_state?.editing
+    if (typeof editing === "string") {
+      state.editing = editing
+      state.id = editing
+    }
     await this.pool.query("UPDATE app.agent_sessions SET client_state = $2, updated_at = now() WHERE id = $1", [
       id,
       JSON.stringify(state)
     ])
     return state as DraftState
+  }
+
+  /**
+   * Opens an installed builder source as a new draft: its id, name, source
+   * information, trigger and recipe (without a run mode), and its key copied
+   * into the draft so reading the source works. Accepting the draft updates
+   * that source (a new version) instead of installing a new one.
+   */
+  async createFromIntegration(integrationId: string, userId: string): Promise<string> {
+    const row = await this.pool.query("SELECT definition FROM app.integrations WHERE id = $1", [integrationId])
+    if (row.rows.length === 0) throw new BuilderError(404, "unknown integration")
+    const definition = row.rows[0].definition as IntegrationDefinition
+    if (!definition.recipe) throw new BuilderError(400, "Only sources made with the builder can be edited in the builder.")
+    const { mode: _mode, ...config } = definition.recipe.config as unknown as Record<string, unknown>
+    void _mode
+    const state: DraftState = {
+      step: "source",
+      id: integrationId,
+      name: definition.name,
+      source: definition.source as SourceInfo,
+      trigger: definition.trigger,
+      recipe: { ...definition.recipe, config: config as unknown as Recipe["config"] },
+      editing: integrationId
+    }
+    const created = await this.pool.query(
+      `INSERT INTO app.agent_sessions (kind, user_id, status, client_state) VALUES ('builder', $1, 'active', $2) RETURNING id`,
+      [userId, JSON.stringify(state)]
+    )
+    const draftId = created.rows[0].id as string
+    if (definition.secrets?.includes(KEY_NAME)) {
+      const key = this.secretKey()
+      const kept = await getSecrets(this.pool, key, integrationId, [KEY_NAME]).catch(() => null)
+      if (kept?.[KEY_NAME]) await setDraftSecret(this.pool, key, draftId, KEY_NAME, kept[KEY_NAME])
+    }
+    return draftId
   }
 
   /** Runs the connector in inspect mode and returns its inspect.json: columns with samples, and the row count. */
@@ -283,7 +327,15 @@ export class BuilderService {
     } catch (err) {
       throw new BuilderError(400, err instanceof Error ? err.message : String(err))
     }
-    if (await idTaken(this.pool, this.options.libraryPath, id)) {
+    const editing = draft.state.editing
+    let installed: IntegrationDefinition | null = null
+    if (editing) {
+      if (editing !== id) throw new BuilderError(400, "An edited source keeps its id.")
+      const row = await this.pool.query("SELECT definition FROM app.integrations WHERE id = $1", [editing])
+      installed = (row.rows[0]?.definition as IntegrationDefinition | undefined) ?? null
+      if (!installed?.recipe) throw new BuilderError(409, "The source being edited is no longer installed.")
+      if (installed.recipe.connector !== recipe.connector) throw new BuilderError(400, "The connector of an installed source cannot be changed.")
+    } else if (await idTaken(this.pool, this.options.libraryPath, id)) {
       throw new BuilderError(409, `The id "${id}" is already used by another source.`)
     }
     const places = recipe.config.places
@@ -326,10 +378,30 @@ export class BuilderService {
          ORDER BY uploaded_at DESC, version DESC LIMIT 1`,
         [draft.id, slotId]
       )
+      // An edited source keeps its current file when none is uploaded
+      if (staged.rows.length === 0 && editing) continue
       if (staged.rows.length === 0) throw new BuilderError(400, "Upload a file before accepting the source.")
       pins[slotId] = staged.rows[0].id
     }
     const key = Object.keys(secrets).length > 0 ? this.secretKey() : null
+    if (installed) {
+      // Deployment-owned fields stay as installed; the builder changes the recipe
+      const owned: Record<string, unknown> = { ...definition }
+      for (const field of ["aoi", "trigger", "limits", "settingValues"] as const) {
+        if (field in installed) owned[field] = installed[field]
+        else delete owned[field]
+      }
+      definition = owned as unknown as IntegrationDefinition
+      try {
+        await installIntegration(this.pool, definition, "ready", draft.userId ?? userId)
+        for (const [secretName, value] of Object.entries(secrets)) await setSecret(this.pool, key!, id, secretName, value)
+        if (Object.keys(pins).length > 0) await adoptSessionFiles(this.pool, draft.id, id, Object.values(pins))
+      } catch (err) {
+        if (err instanceof BuilderError) throw err
+        throw new BuilderError(400, err instanceof Error ? err.message : String(err))
+      }
+      return this.finishAccept(draft, id, definition, pins)
+    }
 
     await this.options.beforeInstall?.(id)
     // Insert-only and disabled: nothing else's integration is touched, and the
@@ -358,6 +430,17 @@ export class BuilderService {
       throw err
     }
 
+    return this.finishAccept(draft, id, definition, pins)
+  }
+
+  /** Queues the first run, finishes the draft and cleans its scratch area. */
+  private async finishAccept(
+    draft: Draft,
+    id: string,
+    definition: IntegrationDefinition,
+    pins: Record<string, string>
+  ): Promise<AcceptResult> {
+    const slotIds = Object.keys(pins)
     const result: AcceptResult = { integrationId: id }
     if (definition.trigger.webhook) {
       const token = await getWebhookToken(this.pool, id)
@@ -680,6 +763,15 @@ export async function routeBuilder(
         return true
       }
       json(res, 201, { id: await builder.create(user.id) })
+      return true
+    }
+    const fromMatch = pathname.match(/^\/api\/builder\/drafts\/from-integration\/([a-z][a-z0-9_]*)$/)
+    if (fromMatch) {
+      if (req.method !== "POST") {
+        refuse(res, 405, "POST only")
+        return true
+      }
+      json(res, 201, { id: await builder.createFromIntegration(fromMatch[1], user.id) })
       return true
     }
     const match = pathname.match(DRAFT_PATH)

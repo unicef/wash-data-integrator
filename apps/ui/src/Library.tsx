@@ -1,8 +1,10 @@
 import { LoadState } from "./LoadState.js"
 import { useEffect, useMemo, useState } from "react"
 import {
+  approveBuiltEntry,
   DefaultAoi,
   getLibraryEntry,
+  importBuiltEntry,
   getSettings,
   getSkill,
   installLibraryEntry,
@@ -10,6 +12,7 @@ import {
   LibraryEntry,
   listLibrary,
   listSkills,
+  rejectBuiltEntry,
   SkillDetail,
   SkillSummary,
   User
@@ -208,11 +211,15 @@ export function Library({ user, installId }: LibraryProps) {
   const [confirming, setConfirming] = useState<string | null>(null)
   const [runNow, setRunNow] = useState(true)
   const [busy, setBusy] = useState(false)
-  const [installed, setInstalled] = useState<{ id: string; version: number; ran: boolean } | null>(null)
+  const [installed, setInstalled] = useState<{ id: string; version: number; ran: boolean; needsSchedule: boolean } | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [rejecting, setRejecting] = useState<string | null>(null)
+  const [rejectNote, setRejectNote] = useState("")
   const [query, setQuery] = useState("")
   const [filter, setFilter] = useState<"all" | "installed" | "updates">("all")
 
   const canDesign = user.role !== "viewer"
+  const isAdmin = user.role === "admin"
 
   function refresh() {
     setError(null)
@@ -277,7 +284,9 @@ export function Library({ user, installId }: LibraryProps) {
     setError(null)
     try {
       const result = await installLibraryEntry(entry.id, runNow)
-      setInstalled({ id: entry.id, version: result.version, ran: result.runId !== null })
+      // A built source arrives without a schedule (the schedule is the deployment's), unless it takes pushed data
+      const needsSchedule = entry.origin === "built" && entry.status === "not_installed" && !entry.trigger.webhook
+      setInstalled({ id: entry.id, version: result.version, ran: result.runId !== null, needsSchedule })
       setConfirming(null)
       refresh()
     } catch (err) {
@@ -287,6 +296,41 @@ export function Library({ user, installId }: LibraryProps) {
     }
   }
 
+  /** Runs an admin decision or an import, then reloads the list. */
+  async function decide(work: () => Promise<string>) {
+    setBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      setNotice(await work())
+      setRejecting(null)
+      setRejectNote("")
+      refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** Reads a shared entry file and stores it for approval. */
+  async function importFile(file: File) {
+    await decide(async () => {
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(await file.text())
+      } catch {
+        throw new Error(T`This file is not a library entry file.`)
+      }
+      const result = await importBuiltEntry(parsed)
+      return result.pending
+        ? T`Imported ${result.id}. The new version waits for approval.`
+        : result.status === "approved"
+          ? T`Imported ${result.id}.`
+          : T`Imported ${result.id}. It waits for approval.`
+    })
+  }
+
   return (
     <main className="list-page library-page">
       <header className="library-header">
@@ -294,11 +338,19 @@ export function Library({ user, installId }: LibraryProps) {
         <p>{T`Ready-made integrations to bring new data into your deployment.`}</p>
       </header>
       {error && entries !== null && <div className="error" role="alert">{error}</div>}
+      {notice && <p className="library-notice" role="status">{notice}</p>}
       {installed && (
         <p className="library-notice" role="status">
           {installed.ran
             ? T`Installed ${<a href={`#/integration/${installed.id}`}>{installed.id}</a>} (v${installed.version}); first ingest started.`
             : T`Installed ${<a href={`#/integration/${installed.id}`}>{installed.id}</a>} (v${installed.version}).`}
+          {installed.needsSchedule && (
+            <>
+              {" "}
+              {T`This source has no schedule yet.`}{" "}
+              <a href={`#/integration/${installed.id}`}>{T`Set a schedule`}</a>
+            </>
+          )}
         </p>
       )}
       {entries === null ? (
@@ -316,6 +368,22 @@ export function Library({ user, installId }: LibraryProps) {
             placeholder={T`Search the library`}
             aria-label={T`Search the library`}
           />
+          {isAdmin && (
+            <label className="button-link secondary compact" title={T`Add an entry shared as a .wash-di.json file. It waits for approval.`}>
+              {T`Import entry`}
+              <input
+                type="file"
+                accept=".json,application/json"
+                hidden
+                disabled={busy}
+                onChange={e => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ""
+                  if (file) void importFile(file)
+                }}
+              />
+            </label>
+          )}
           <div className="library-filters" role="group" aria-label={T`Filter integrations`}>
             {([
               ["all", T`All`, entries.length],
@@ -358,16 +426,45 @@ export function Library({ user, installId }: LibraryProps) {
                     </span>
                   </button>
                   <div className="library-entry-actions">
+                    <span className={`chip ${entry.origin === "built" ? "chip-table" : ""}`}>{entry.origin === "built" ? T`Built here` : T`Shipped`}</span>
+                    {entry.builtStatus === "proposed" && <span className="chip chip-paused">{T`Waiting for approval`}</span>}
+                    {entry.pendingVersion && entry.builtStatus === "approved" && <span className="chip chip-paused">{T`New version waiting`}</span>}
+                    {entry.changedHere && <span className="chip chip-paused" title={T`The installed copy differs from the approved entry`}>{T`Changed here`}</span>}
                     {entry.status !== "not_installed" && <span className={`chip ${entry.status === "installed" ? "chip-finished" : "chip-paused"}`}>{statusLabels()[entry.status]}</span>}
-                    {canDesign && entry.status !== "installed" ? (
+                    {entry.builtStatus === "proposed" ? null : canDesign && entry.status !== "installed" ? (
                       <button disabled={busy} aria-expanded={confirming === entry.id} aria-controls={confirming === entry.id ? `library-confirm-${entry.id}` : undefined} onClick={() => { setConfirming(confirming === entry.id ? null : entry.id); setInstalled(null) }}>
                         {entry.status === "not_installed" ? T`Install` : T`Update`}
                       </button>
                     ) : entry.status !== "not_installed" ? (
                       <a href={`#/integration/${entry.id}`}>{T`Open Integration`} <span aria-hidden="true">→</span></a>
                     ) : <span className="dim">{statusLabels()[entry.status]}</span>}
+                    {canDesign && entry.origin === "built" && entry.builtStatus === "approved" && (
+                      <a href={`/api/library/built/${entry.id}/export`} download title={T`Download this entry as a file another deployment can import`}>{T`Export`}</a>
+                    )}
                   </div>
                 </div>
+                {isAdmin && (entry.builtStatus === "proposed" || entry.pendingVersion) && (
+                  <div className="library-confirm-body" role="region" aria-label={T`Approval`}>
+                    <h3>{entry.builtStatus === "proposed" ? T`Waiting for approval` : T`A new version waits for approval`}</h3>
+                    {rejecting === entry.id ? (
+                      <>
+                        <label>
+                          {T`Reason (optional)`}
+                          <input type="text" disabled={busy} value={rejectNote} onChange={e => setRejectNote(e.target.value)} />
+                        </label>
+                        <div className="aoi-actions">
+                          <button disabled={busy} onClick={() => void decide(async () => { await rejectBuiltEntry(entry.id, rejectNote); return T`Rejected ${entry.id}.` })}>{T`Reject`}</button>
+                          <button className="secondary" disabled={busy} onClick={() => setRejecting(null)}>{T`Cancel`}</button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="aoi-actions">
+                        <button disabled={busy} onClick={() => void decide(async () => { await approveBuiltEntry(entry.id); return T`Approved ${entry.id}.` })}>{T`Approve`}</button>
+                        <button className="secondary" disabled={busy} onClick={() => { setRejecting(entry.id); setRejectNote("") }}>{T`Reject`}</button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div id={`library-detail-${entry.id}`} hidden={expanded !== entry.id} className="library-entry-detail">
                   {expanded === entry.id && <>
                     {entry.description && <p className="library-full-description">{localizeData(entry.description)}</p>}

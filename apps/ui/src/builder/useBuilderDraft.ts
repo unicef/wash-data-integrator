@@ -225,6 +225,8 @@ export interface BuilderModel {
   setError: (error: string | null) => void
   /** File name uploaded in this visit (an upload source) */
   uploadedName: string | null
+  /** The installed source this draft edits; null for a new source */
+  editing: string | null
   setUploadedName: (name: string | null) => void
 }
 
@@ -247,6 +249,7 @@ export function useBuilderDraft(draftId: string, isAdmin: boolean): { model: Bui
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [uploadedName, setUploadedName] = useState<string | null>(null)
+  const [editing, setEditing] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -255,6 +258,7 @@ export function useBuilderDraft(draftId: string, isAdmin: boolean): { model: Bui
       draft => {
         if (cancelled) return
         const loaded = fromState(draft.state)
+        setEditing(draft.state.editing ?? null)
         savedRef.current = JSON.stringify(toState(loaded))
         setWork(loaded)
       },
@@ -373,6 +377,7 @@ export function useBuilderDraft(draftId: string, isAdmin: boolean): { model: Bui
         error,
         setError,
         uploadedName,
+        editing,
         setUploadedName
       }
     : null

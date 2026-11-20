@@ -46,7 +46,7 @@ export function StepAccept({ model }: { model: BuilderModel }) {
       void navigator.clipboard.writeText(text).then(() => setCopied(what), () => setCopied(null))
     return (
       <section className="builder-step">
-        <h2>{T`The source is added`}</h2>
+        <h2>{model.editing ? T`The source is updated` : T`The source is added`}</h2>
         {result.runId && <p>{T`The first run has started. The data appears in the table when it finishes.`}</p>}
         {!url && !result.runId && <p>{T`Start the first run from the source's page.`}</p>}
         {url && curl && (
@@ -81,7 +81,7 @@ export function StepAccept({ model }: { model: BuilderModel }) {
 
   return (
     <section className="builder-step">
-      <h2>{T`Check and add`}</h2>
+      <h2>{model.editing ? T`Check and save` : T`Check and add`}</h2>
       <dl className="builder-summary">
         <dt>{T`Name`}</dt>
         <dd>{work.name}</dd>
@@ -115,13 +115,17 @@ export function StepAccept({ model }: { model: BuilderModel }) {
           </>
         )}
       </dl>
-      <p className="dim">{T`Adding installs the source here and starts its first run. You can change the schedule later on the source's page.`}</p>
+      <p className="dim">
+        {model.editing
+          ? T`Saving updates the source here and starts a run with the new settings. Its schedule stays as it is.`
+          : T`Adding installs the source here and starts its first run. You can change the schedule later on the source's page.`}
+      </p>
       <StepNav
         model={model}
         onBack={() => void model.goTo("schedule")}
         onNext={() => void accept()}
         nextDisabled={adding}
-        nextLabel={adding ? T`Adding…` : T`Add this source`}
+        nextLabel={adding ? (model.editing ? T`Saving…` : T`Adding…`) : model.editing ? T`Save changes` : T`Add this source`}
       />
     </section>
   )

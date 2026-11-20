@@ -306,6 +306,61 @@ curl -X POST -H "Content-Type: application/json" \
   starts the first ingest when a job runner is configured. Returns
   `{version, runId}`.
 
+- `GET /api/library` also lists built entries (made with the source builder)
+  with `origin` (`shipped` or `built`) and, for built ones, `builtStatus`
+  (`proposed`, `approved`; proposed entries are listed to admins only),
+  `changedHere` (the installed copy differs from the approved entry) and, to
+  admins, `pendingVersion` (a new version waits for approval).
+- `POST /api/library/built` - propose an installed builder source for the
+  library (editor/admin). Body `{integrationId}`. Stores its definition without
+  code, area of interest, schedule, limits or setting values. Returns
+  `{id, status}`, plus `pending: true` when it is a new version of an approved
+  entry. Answers 400 for a source without a recipe or with a secret-like key.
+- `POST /api/library/built/:id/approve` and `.../reject` - admin only. Reject
+  takes an optional `{note}`. Approving a pending version replaces the approved
+  one.
+- `GET /api/library/built/:id/export` - an approved entry as the download
+  `<id>.wash-di.json`, format `wash-di-library-entry` version 1 (editor/admin).
+- `POST /api/library/built/import` - admin only. Body is an exported file
+  (up to 1 MB). The entry is stored as proposed (or as a pending version) and
+  nothing is installed. Files that contain `code` are refused (400).
+- `POST /api/library/:id/install` installs an approved built entry like a
+  shipped one. It has no schedule on a fresh install, except a webhook source.
+- `POST /api/integrations/:id/apply-connector-update` - move an installed
+  builder source to its connector's current version and code (editor/admin);
+  settings, schedule and area stay. 409 when it is already current.
+
+## Source builder
+
+No-code source drafts (editor/admin; viewers get 403). A draft is visible to
+its creator and to admins, and holds the screens' state; it is removed after 24
+hours without changes. Inspect and preview run the connector as a scratch run,
+so nothing installed is touched.
+
+- `POST /api/builder/drafts` - start an empty draft. Returns `201 {id}`.
+- `POST /api/builder/drafts/from-integration/:id` - open an installed builder
+  source as a new draft (its recipe without a run mode, and its key copied into
+  the draft). Accepting that draft updates the source as a new version, keeps
+  its schedule, area and other settings, and cannot change its connector or id.
+  400 for a source without a recipe.
+- `GET /api/builder/drafts/:draftId` - the draft and its saved `state`
+  (`step`, `id`, `name`, `source`, `trigger`, `recipe`, and `editing` on an edit
+  draft). `PUT` replaces the state with the fields of the body.
+- `POST .../inspect` - read the source and return its columns with samples and
+  the row count. Links are checked first (private addresses are refused).
+- `POST .../preview` - run the recipe into the draft's scratch schema and
+  return the first rows, `rowCount`, `matched`, `unmatched` and `typeErrors`.
+- `POST .../places/suggest` - body `{names}` (up to 5000); returns exact and
+  close matches against the chosen places table. Close matches are only
+  suggestions.
+- `PUT .../files/:slot?filename=` - upload the draft's file (an upload source);
+  it becomes version 1 of the source's slot on accept.
+- `GET .../secrets` - names of the draft's keys. `PUT .../secrets/api_key` -
+  body `{value}`; admin only, never returned.
+- `POST .../accept` - install the source (or update it, for an edit draft) and
+  queue its first run. Returns `{integrationId, runId?, webhookUrl?}`. 409 when
+  the id is taken or the draft was already accepted, or while a key is awaited.
+
 ## Deployment settings
 
 - `GET /api/countries` - baked-in country bounding boxes (Natural Earth

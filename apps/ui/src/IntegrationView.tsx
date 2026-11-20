@@ -1,6 +1,8 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
+  applyConnectorUpdate,
   CountryBox,
+  createBuilderDraftFromIntegration,
   createSession,
   DefaultAoi,
   deleteIntegration,
@@ -9,7 +11,10 @@ import {
   getIntegrationUsage,
   getIntegrationVersions,
   getSettings,
+  getBuilderDraft,
   getWebhookToken,
+  proposeBuiltEntry,
+  saveBuilderDraft,
   rotateWebhookToken,
   IntegrationDetail,
   IntegrationUsage,
@@ -78,6 +83,8 @@ export function IntegrationView({ integrationId, canDesign, isAdmin }: Integrati
   const [usage, setUsage] = useState<IntegrationUsage | null>(null)
   const [renaming, setRenaming] = useState(false)
   const [rebuilding, setRebuilding] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [working, setWorking] = useState(false)
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const refresh = useCallback(() => {
@@ -130,6 +137,59 @@ export function IntegrationView({ integrationId, canDesign, isAdmin }: Integrati
     }
   }
 
+  /** Opens the builder on an edit draft of this source, at the given step. */
+  async function onEditInBuilder(step: "source" | "places") {
+    setError(null)
+    setNotice(null)
+    setWorking(true)
+    try {
+      const { id } = await createBuilderDraftFromIntegration(integrationId)
+      if (step !== "source") {
+        const draft = await getBuilderDraft(id)
+        await saveBuilderDraft(id, { ...draft.state, step })
+      }
+      window.location.hash = `#/builder/${id}`
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+      setWorking(false)
+    }
+  }
+
+  async function onPropose() {
+    setError(null)
+    setNotice(null)
+    setWorking(true)
+    try {
+      const result = await proposeBuiltEntry(integrationId)
+      setNotice(
+        result.pending
+          ? T`Sent for approval. The new version of the library entry waits for an admin.`
+          : result.status === "approved"
+            ? T`This source is already in the library.`
+            : T`Sent for approval. An admin will review it in the library.`
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  async function onApplyConnectorUpdate() {
+    setError(null)
+    setNotice(null)
+    setWorking(true)
+    try {
+      await applyConnectorUpdate(integrationId)
+      setNotice(T`The source now uses the current version of its connector.`)
+      refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setWorking(false)
+    }
+  }
+
   async function onToggleEnabled() {
     setError(null)
     try {
@@ -167,6 +227,11 @@ export function IntegrationView({ integrationId, canDesign, isAdmin }: Integrati
   const trigger = (definition.trigger ?? {}) as { cron?: string; webhook?: boolean }
   // A webhook-only integration has nothing to fetch: its data arrives in deliveries
   const canRebuild = canDesign && detail.status !== "draft" && !(trigger.webhook && !trigger.cron)
+  const isBuilder = !!definition.recipe
+  const connector = (definition.recipe as { connector?: string } | undefined)?.connector
+  const noSchedule = isBuilder && !trigger.cron && !trigger.webhook && connector !== "upload"
+  const latestRun = detail.runs.find(run => run.status === "succeeded")
+  const unmatched = isBuilder ? latestRun?.unmatched ?? null : null
   const tableIds = detail.destinations.filter(d => d.kind === "table").map(d => d.id)
   // Data leads when there is data to show; raster-only integrations lead with runs
   const tab = picked ?? (tableIds.length > 0 ? "data" : "runs")
@@ -197,6 +262,21 @@ export function IntegrationView({ integrationId, canDesign, isAdmin }: Integrati
             {canDesign ? (
               <button role="menuitem" onClick={() => void onDesign()}>
                 {T`Design with Agent`}
+              </button>
+            ) : null}
+            {canDesign && isBuilder ? (
+              <button role="menuitem" disabled={working} onClick={() => void onEditInBuilder("source")}>
+                {T`Edit in builder`}
+              </button>
+            ) : null}
+            {canDesign && isBuilder ? (
+              <button
+                role="menuitem"
+                disabled={working}
+                title={T`Send this source to an admin for approval, so others can install it from the library`}
+                onClick={() => void onPropose()}
+              >
+                {T`Propose for library`}
               </button>
             ) : null}
             {canDesign ? (
@@ -241,6 +321,35 @@ export function IntegrationView({ integrationId, canDesign, isAdmin }: Integrati
         </div>
       </div>
       {error && <div className="error">{error}</div>}
+      {notice && <p className="library-notice" role="status">{notice}</p>}
+      {canDesign && detail.connectorUpdate && (
+        <div className="panel integration-notice" role="status">
+          <span className="grow">{T`Update available: this source's connector has a newer version. Your settings, schedule and area stay as they are.`}</span>
+          <button disabled={working} onClick={() => void onApplyConnectorUpdate()}>
+            {T`Update the connector`}
+          </button>
+        </div>
+      )}
+      {canDesign && unmatched && (
+        <div className="panel integration-notice" role="status">
+          <div className="grow">
+            <b>{unmatched.count === 1 ? T`1 place name was not matched in the last run` : T`${unmatched.count} place names were not matched in the last run`}</b>
+            <div className="dim">
+              {unmatched.places.join(", ")}
+              {unmatched.count > unmatched.places.length ? ` ${T`and ${unmatched.count - unmatched.places.length} more`}` : ""}
+            </div>
+          </div>
+          <button disabled={working} onClick={() => void onEditInBuilder("places")}>
+            {T`Fix matches`}
+          </button>
+        </div>
+      )}
+      {canDesign && noSchedule && (
+        <p className="dim integration-notice" role="status">
+          {T`This source has no schedule yet.`}{" "}
+          <button className="link" onClick={() => setPicked("definition")}>{T`Set a schedule`}</button>
+        </p>
+      )}
       {renaming && (
         <RenameIntegrationDialog
           id={detail.id}

@@ -1,6 +1,7 @@
 import pg from "pg"
 import { LocalizedString, IntegrationDefinition } from "@data-integrator/definitions"
 import { RunFlag } from "./validation.js"
+import { CONNECTORS } from "./builder/connectors.js"
 
 /** Summary row for the integrations list. */
 export interface IntegrationSummary {
@@ -44,6 +45,8 @@ export interface RunSummary {
   error: string | null
   /** Validation flags the run raised; null when none */
   flags: RunFlag[] | null
+  /** Place names a builder source could not match in this run (first 50); null for other runs */
+  unmatched: { count: number; places: string[] } | null
 }
 
 /** Per-destination stored-data stats. */
@@ -74,6 +77,8 @@ export interface IntegrationDetail {
   runs: RunSummary[]
   /** Stored-data stats per destination */
   destinations: DestinationStats[]
+  /** A builder source whose connector has a newer version; null otherwise */
+  connectorUpdate: { from: number; to: number } | null
 }
 
 /** Lists installed integrations with their latest run, newest first. */
@@ -115,7 +120,8 @@ export async function getIntegration(pool: pg.Pool, id: string): Promise<Integra
   const { version, definition, enabled, status, updated_at } = result.rows[0]
 
   const runs = await pool.query(
-    `SELECT id, trigger, status, started_at, finished_at, stats, error, flags
+    `SELECT id, trigger, status, started_at, finished_at, stats, error, flags,
+            state_out->'unmatchedCount' AS unmatched_count, state_out->'unmatchedPlaces' AS unmatched_places
      FROM app.runs WHERE integration_id = $1 ORDER BY scheduled_at DESC LIMIT 50`,
     [id]
   )
@@ -157,10 +163,23 @@ export async function getIntegration(pool: pg.Pool, id: string): Promise<Integra
       finishedAt: row.finished_at ? row.finished_at.toISOString() : null,
       stats: row.stats,
       error: row.error,
-      flags: row.flags ?? null
+      flags: row.flags ?? null,
+      unmatched:
+        typeof row.unmatched_count === "number" && row.unmatched_count > 0 && Array.isArray(row.unmatched_places)
+          ? { count: row.unmatched_count, places: row.unmatched_places.map(String) }
+          : null
     })),
-    destinations
+    destinations,
+    connectorUpdate: connectorUpdateOf(definition as IntegrationDefinition)
   }
+}
+
+/** The connector versions a builder source is on and could move to, or null when it is current or not a builder source. */
+function connectorUpdateOf(definition: IntegrationDefinition): { from: number; to: number } | null {
+  const recipe = definition.recipe
+  const info = recipe ? CONNECTORS[recipe.connector] : undefined
+  if (!recipe || !info || recipe.connectorVersion >= info.version) return null
+  return { from: recipe.connectorVersion, to: info.version }
 }
 
 /** How a definition version answers the area-of-interest question. */

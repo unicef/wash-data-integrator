@@ -805,6 +805,450 @@
         "requestBody": { "content": { "application/json": { "schema": { "description": "{runNow?: boolean}" } } } },
         "responses": { "200": { "description": "{ version, runId }" }, "404": { "description": "Unknown library entry" } }
       }
+    },
+    "/api/library/built": {
+      "post": {
+        "summary": "Propose an installed builder source for the library (editor or admin). Stored without code, aoi, trigger, limits or setting values",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "description": "{integrationId}"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "{ id, status, pending? }"
+          },
+          "400": {
+            "description": "No recipe, or a secret-like key"
+          },
+          "404": {
+            "description": "Unknown integration"
+          }
+        }
+      }
+    },
+    "/api/library/built/{id}/approve": {
+      "post": {
+        "summary": "Approve a proposed built entry, or its pending version (admin only)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{ id, status, version }"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "Nothing to approve"
+          }
+        }
+      }
+    },
+    "/api/library/built/{id}/reject": {
+      "post": {
+        "summary": "Reject a proposed built entry or its pending version (admin only)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "description": "{note?: string}"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "{ id }"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "Nothing to reject"
+          }
+        }
+      }
+    },
+    "/api/library/built/{id}/export": {
+      "get": {
+        "summary": "An approved built entry as a <id>.wash-di.json attachment: { format: \"wash-di-library-entry\", version: 1, definition } without code, aoi or setting values (editor or admin)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Library entry file"
+          },
+          "404": {
+            "description": "Unknown or not approved"
+          }
+        }
+      }
+    },
+    "/api/library/built/import": {
+      "post": {
+        "summary": "Import a shared entry file (admin only, up to 1 MB). Stored as proposed, or as the pending version of an approved entry; nothing is installed. Files with code are refused",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "description": "A library entry file"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "{ id, status, pending? }"
+          },
+          "400": {
+            "description": "Not a valid entry file"
+          },
+          "403": {
+            "description": "Not an admin"
+          }
+        }
+      }
+    },
+    "/api/integrations/{id}/apply-connector-update": {
+      "post": {
+        "summary": "Move an installed builder source to its connector's current version and code (editor or admin); settings, schedule and area stay",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{ version }"
+          },
+          "400": {
+            "description": "Not a builder source"
+          },
+          "409": {
+            "description": "Already up to date"
+          }
+        }
+      }
+    },
+    "/api/builder/drafts": {
+      "post": {
+        "summary": "Start an empty source builder draft (editor or admin)",
+        "responses": {
+          "201": {
+            "description": "{ id }"
+          },
+          "403": {
+            "description": "Viewers cannot build sources"
+          }
+        }
+      }
+    },
+    "/api/builder/drafts/from-integration/{id}": {
+      "post": {
+        "summary": "Open an installed builder source as a new draft; accepting it updates that source (a new version) and keeps its schedule, area and settings",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "{ id }"
+          },
+          "400": {
+            "description": "Not a builder source"
+          },
+          "404": {
+            "description": "Unknown integration"
+          }
+        }
+      }
+    },
+    "/api/builder/drafts/{draftId}": {
+      "get": {
+        "summary": "A draft and its saved screens: step, id, name, source, trigger, recipe, and editing on an edit draft",
+        "parameters": [
+          {
+            "name": "draftId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Draft"
+          },
+          "404": {
+            "description": "Unknown draft"
+          }
+        }
+      },
+      "put": {
+        "summary": "Replace the draft's saved screens with the known fields of the body",
+        "parameters": [
+          {
+            "name": "draftId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "description": "{step?, id?, name?, source?, trigger?, recipe?}"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "{ id, state }"
+          },
+          "400": {
+            "description": "Invalid id or recipe"
+          }
+        }
+      }
+    },
+    "/api/builder/drafts/{draftId}/inspect": {
+      "post": {
+        "summary": "Read the source and return its columns with samples and the row count (links are checked first)",
+        "parameters": [
+          {
+            "name": "draftId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inspect result"
+          },
+          "400": {
+            "description": "Invalid recipe or link"
+          },
+          "422": {
+            "description": "Reading the source failed"
+          }
+        }
+      }
+    },
+    "/api/builder/drafts/{draftId}/preview": {
+      "post": {
+        "summary": "Run the recipe into the draft's scratch schema; returns the first rows, rowCount, matched, unmatched and typeErrors",
+        "parameters": [
+          {
+            "name": "draftId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Preview result"
+          },
+          "422": {
+            "description": "The preview failed"
+          }
+        }
+      }
+    },
+    "/api/builder/drafts/{draftId}/places/suggest": {
+      "post": {
+        "summary": "Exact and close matches of source names (up to 5000) against the chosen places table",
+        "parameters": [
+          {
+            "name": "draftId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "description": "{names: string[]}"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Suggestions"
+          }
+        }
+      }
+    },
+    "/api/builder/drafts/{draftId}/files/{slot}": {
+      "put": {
+        "summary": "Upload the draft's file for an upload source (query: filename); it becomes version 1 of the slot on accept",
+        "parameters": [
+          {
+            "name": "draftId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slot",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filename",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Uploaded file version"
+          }
+        }
+      }
+    },
+    "/api/builder/drafts/{draftId}/secrets": {
+      "get": {
+        "summary": "Names of the draft's keys, never their values",
+        "parameters": [
+          {
+            "name": "draftId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{ secrets }"
+          }
+        }
+      }
+    },
+    "/api/builder/drafts/{draftId}/secrets/api_key": {
+      "put": {
+        "summary": "Set the draft's key (admin only); never returned",
+        "parameters": [
+          {
+            "name": "draftId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "description": "{value}"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "{ name }"
+          },
+          "403": {
+            "description": "Not an admin"
+          }
+        }
+      }
+    },
+    "/api/builder/drafts/{draftId}/accept": {
+      "post": {
+        "summary": "Install the source (or update it, for an edit draft) and queue its first run",
+        "parameters": [
+          {
+            "name": "draftId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{ integrationId, runId?, webhookUrl? }"
+          },
+          "400": {
+            "description": "Invalid recipe or missing file"
+          },
+          "409": {
+            "description": "Id taken, already accepted, or waiting for a key"
+          }
+        }
+      }
     }
   }
 }

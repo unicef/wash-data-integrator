@@ -9232,6 +9232,375 @@
       "es": "Leave this page? Changes on this step are not saved yet.",
       "mg": "Leave this page? Changes on this step are not saved yet.",
       "sw": "Leave this page? Changes on this step are not saved yet."
+    },
+    {
+      "_base": "en",
+      "en": "Edit source",
+      "fr": "Edit source",
+      "pt": "Edit source",
+      "es": "Edit source",
+      "mg": "Edit source",
+      "sw": "Edit source"
+    },
+    {
+      "_base": "en",
+      "en": "Change this source step by step. Saving at the last step updates it here; the schedule and other settings of the source stay as they are.",
+      "fr": "Change this source step by step. Saving at the last step updates it here; the schedule and other settings of the source stay as they are.",
+      "pt": "Change this source step by step. Saving at the last step updates it here; the schedule and other settings of the source stay as they are.",
+      "es": "Change this source step by step. Saving at the last step updates it here; the schedule and other settings of the source stay as they are.",
+      "mg": "Change this source step by step. Saving at the last step updates it here; the schedule and other settings of the source stay as they are.",
+      "sw": "Change this source step by step. Saving at the last step updates it here; the schedule and other settings of the source stay as they are."
+    },
+    {
+      "_base": "en",
+      "en": "The source is updated",
+      "fr": "The source is updated",
+      "pt": "The source is updated",
+      "es": "The source is updated",
+      "mg": "The source is updated",
+      "sw": "The source is updated"
+    },
+    {
+      "_base": "en",
+      "en": "Check and save",
+      "fr": "Check and save",
+      "pt": "Check and save",
+      "es": "Check and save",
+      "mg": "Check and save",
+      "sw": "Check and save"
+    },
+    {
+      "_base": "en",
+      "en": "Saving updates the source here and starts a run with the new settings. Its schedule stays as it is.",
+      "fr": "Saving updates the source here and starts a run with the new settings. Its schedule stays as it is.",
+      "pt": "Saving updates the source here and starts a run with the new settings. Its schedule stays as it is.",
+      "es": "Saving updates the source here and starts a run with the new settings. Its schedule stays as it is.",
+      "mg": "Saving updates the source here and starts a run with the new settings. Its schedule stays as it is.",
+      "sw": "Saving updates the source here and starts a run with the new settings. Its schedule stays as it is."
+    },
+    {
+      "_base": "en",
+      "en": "Save changes",
+      "fr": "Save changes",
+      "pt": "Save changes",
+      "es": "Save changes",
+      "mg": "Save changes",
+      "sw": "Save changes"
+    },
+    {
+      "_base": "en",
+      "en": "Sent for approval. The new version of the library entry waits for an admin.",
+      "fr": "Sent for approval. The new version of the library entry waits for an admin.",
+      "pt": "Sent for approval. The new version of the library entry waits for an admin.",
+      "es": "Sent for approval. The new version of the library entry waits for an admin.",
+      "mg": "Sent for approval. The new version of the library entry waits for an admin.",
+      "sw": "Sent for approval. The new version of the library entry waits for an admin."
+    },
+    {
+      "_base": "en",
+      "en": "This source is already in the library.",
+      "fr": "This source is already in the library.",
+      "pt": "This source is already in the library.",
+      "es": "This source is already in the library.",
+      "mg": "This source is already in the library.",
+      "sw": "This source is already in the library."
+    },
+    {
+      "_base": "en",
+      "en": "Sent for approval. An admin will review it in the library.",
+      "fr": "Sent for approval. An admin will review it in the library.",
+      "pt": "Sent for approval. An admin will review it in the library.",
+      "es": "Sent for approval. An admin will review it in the library.",
+      "mg": "Sent for approval. An admin will review it in the library.",
+      "sw": "Sent for approval. An admin will review it in the library."
+    },
+    {
+      "_base": "en",
+      "en": "The source now uses the current version of its connector.",
+      "fr": "The source now uses the current version of its connector.",
+      "pt": "The source now uses the current version of its connector.",
+      "es": "The source now uses the current version of its connector.",
+      "mg": "The source now uses the current version of its connector.",
+      "sw": "The source now uses the current version of its connector."
+    },
+    {
+      "_base": "en",
+      "en": "Edit in builder",
+      "fr": "Edit in builder",
+      "pt": "Edit in builder",
+      "es": "Edit in builder",
+      "mg": "Edit in builder",
+      "sw": "Edit in builder"
+    },
+    {
+      "_base": "en",
+      "en": "Send this source to an admin for approval, so others can install it from the library",
+      "fr": "Send this source to an admin for approval, so others can install it from the library",
+      "pt": "Send this source to an admin for approval, so others can install it from the library",
+      "es": "Send this source to an admin for approval, so others can install it from the library",
+      "mg": "Send this source to an admin for approval, so others can install it from the library",
+      "sw": "Send this source to an admin for approval, so others can install it from the library"
+    },
+    {
+      "_base": "en",
+      "en": "Propose for library",
+      "fr": "Propose for library",
+      "pt": "Propose for library",
+      "es": "Propose for library",
+      "mg": "Propose for library",
+      "sw": "Propose for library"
+    },
+    {
+      "_base": "en",
+      "en": "Update available: this source's connector has a newer version. Your settings, schedule and area stay as they are.",
+      "fr": "Update available: this source's connector has a newer version. Your settings, schedule and area stay as they are.",
+      "pt": "Update available: this source's connector has a newer version. Your settings, schedule and area stay as they are.",
+      "es": "Update available: this source's connector has a newer version. Your settings, schedule and area stay as they are.",
+      "mg": "Update available: this source's connector has a newer version. Your settings, schedule and area stay as they are.",
+      "sw": "Update available: this source's connector has a newer version. Your settings, schedule and area stay as they are."
+    },
+    {
+      "_base": "en",
+      "en": "Update the connector",
+      "fr": "Update the connector",
+      "pt": "Update the connector",
+      "es": "Update the connector",
+      "mg": "Update the connector",
+      "sw": "Update the connector"
+    },
+    {
+      "_base": "en",
+      "en": "1 place name was not matched in the last run",
+      "fr": "1 place name was not matched in the last run",
+      "pt": "1 place name was not matched in the last run",
+      "es": "1 place name was not matched in the last run",
+      "mg": "1 place name was not matched in the last run",
+      "sw": "1 place name was not matched in the last run"
+    },
+    {
+      "_base": "en",
+      "en": "{0} place names were not matched in the last run",
+      "fr": "{0} place names were not matched in the last run",
+      "pt": "{0} place names were not matched in the last run",
+      "es": "{0} place names were not matched in the last run",
+      "mg": "{0} place names were not matched in the last run",
+      "sw": "{0} place names were not matched in the last run"
+    },
+    {
+      "_base": "en",
+      "en": "and {0} more",
+      "fr": "and {0} more",
+      "pt": "and {0} more",
+      "es": "and {0} more",
+      "mg": "and {0} more",
+      "sw": "and {0} more"
+    },
+    {
+      "_base": "en",
+      "en": "Fix matches",
+      "fr": "Fix matches",
+      "pt": "Fix matches",
+      "es": "Fix matches",
+      "mg": "Fix matches",
+      "sw": "Fix matches"
+    },
+    {
+      "_base": "en",
+      "en": "This source has no schedule yet.",
+      "fr": "This source has no schedule yet.",
+      "pt": "This source has no schedule yet.",
+      "es": "This source has no schedule yet.",
+      "mg": "This source has no schedule yet.",
+      "sw": "This source has no schedule yet."
+    },
+    {
+      "_base": "en",
+      "en": "Set a schedule",
+      "fr": "Set a schedule",
+      "pt": "Set a schedule",
+      "es": "Set a schedule",
+      "mg": "Set a schedule",
+      "sw": "Set a schedule"
+    },
+    {
+      "_base": "en",
+      "en": "This file is not a library entry file.",
+      "fr": "This file is not a library entry file.",
+      "pt": "This file is not a library entry file.",
+      "es": "This file is not a library entry file.",
+      "mg": "This file is not a library entry file.",
+      "sw": "This file is not a library entry file."
+    },
+    {
+      "_base": "en",
+      "en": "Imported {0}. The new version waits for approval.",
+      "fr": "Imported {0}. The new version waits for approval.",
+      "pt": "Imported {0}. The new version waits for approval.",
+      "es": "Imported {0}. The new version waits for approval.",
+      "mg": "Imported {0}. The new version waits for approval.",
+      "sw": "Imported {0}. The new version waits for approval."
+    },
+    {
+      "_base": "en",
+      "en": "Imported {0}.",
+      "fr": "Imported {0}.",
+      "pt": "Imported {0}.",
+      "es": "Imported {0}.",
+      "mg": "Imported {0}.",
+      "sw": "Imported {0}."
+    },
+    {
+      "_base": "en",
+      "en": "Imported {0}. It waits for approval.",
+      "fr": "Imported {0}. It waits for approval.",
+      "pt": "Imported {0}. It waits for approval.",
+      "es": "Imported {0}. It waits for approval.",
+      "mg": "Imported {0}. It waits for approval.",
+      "sw": "Imported {0}. It waits for approval."
+    },
+    {
+      "_base": "en",
+      "en": "Add an entry shared as a .wash-di.json file. It waits for approval.",
+      "fr": "Add an entry shared as a .wash-di.json file. It waits for approval.",
+      "pt": "Add an entry shared as a .wash-di.json file. It waits for approval.",
+      "es": "Add an entry shared as a .wash-di.json file. It waits for approval.",
+      "mg": "Add an entry shared as a .wash-di.json file. It waits for approval.",
+      "sw": "Add an entry shared as a .wash-di.json file. It waits for approval."
+    },
+    {
+      "_base": "en",
+      "en": "Import entry",
+      "fr": "Import entry",
+      "pt": "Import entry",
+      "es": "Import entry",
+      "mg": "Import entry",
+      "sw": "Import entry"
+    },
+    {
+      "_base": "en",
+      "en": "Built here",
+      "fr": "Built here",
+      "pt": "Built here",
+      "es": "Built here",
+      "mg": "Built here",
+      "sw": "Built here"
+    },
+    {
+      "_base": "en",
+      "en": "Shipped",
+      "fr": "Shipped",
+      "pt": "Shipped",
+      "es": "Shipped",
+      "mg": "Shipped",
+      "sw": "Shipped"
+    },
+    {
+      "_base": "en",
+      "en": "Waiting for approval",
+      "fr": "Waiting for approval",
+      "pt": "Waiting for approval",
+      "es": "Waiting for approval",
+      "mg": "Waiting for approval",
+      "sw": "Waiting for approval"
+    },
+    {
+      "_base": "en",
+      "en": "New version waiting",
+      "fr": "New version waiting",
+      "pt": "New version waiting",
+      "es": "New version waiting",
+      "mg": "New version waiting",
+      "sw": "New version waiting"
+    },
+    {
+      "_base": "en",
+      "en": "The installed copy differs from the approved entry",
+      "fr": "The installed copy differs from the approved entry",
+      "pt": "The installed copy differs from the approved entry",
+      "es": "The installed copy differs from the approved entry",
+      "mg": "The installed copy differs from the approved entry",
+      "sw": "The installed copy differs from the approved entry"
+    },
+    {
+      "_base": "en",
+      "en": "Changed here",
+      "fr": "Changed here",
+      "pt": "Changed here",
+      "es": "Changed here",
+      "mg": "Changed here",
+      "sw": "Changed here"
+    },
+    {
+      "_base": "en",
+      "en": "Download this entry as a file another deployment can import",
+      "fr": "Download this entry as a file another deployment can import",
+      "pt": "Download this entry as a file another deployment can import",
+      "es": "Download this entry as a file another deployment can import",
+      "mg": "Download this entry as a file another deployment can import",
+      "sw": "Download this entry as a file another deployment can import"
+    },
+    {
+      "_base": "en",
+      "en": "Approval",
+      "fr": "Approval",
+      "pt": "Approval",
+      "es": "Approval",
+      "mg": "Approval",
+      "sw": "Approval"
+    },
+    {
+      "_base": "en",
+      "en": "A new version waits for approval",
+      "fr": "A new version waits for approval",
+      "pt": "A new version waits for approval",
+      "es": "A new version waits for approval",
+      "mg": "A new version waits for approval",
+      "sw": "A new version waits for approval"
+    },
+    {
+      "_base": "en",
+      "en": "Reason (optional)",
+      "fr": "Reason (optional)",
+      "pt": "Reason (optional)",
+      "es": "Reason (optional)",
+      "mg": "Reason (optional)",
+      "sw": "Reason (optional)"
+    },
+    {
+      "_base": "en",
+      "en": "Rejected {0}.",
+      "fr": "Rejected {0}.",
+      "pt": "Rejected {0}.",
+      "es": "Rejected {0}.",
+      "mg": "Rejected {0}.",
+      "sw": "Rejected {0}."
+    },
+    {
+      "_base": "en",
+      "en": "Reject",
+      "fr": "Reject",
+      "pt": "Reject",
+      "es": "Reject",
+      "mg": "Reject",
+      "sw": "Reject"
+    },
+    {
+      "_base": "en",
+      "en": "Approved {0}.",
+      "fr": "Approved {0}.",
+      "pt": "Approved {0}.",
+      "es": "Approved {0}.",
+      "mg": "Approved {0}.",
+      "sw": "Approved {0}."
+    },
+    {
+      "_base": "en",
+      "en": "Approve",
+      "fr": "Approve",
+      "pt": "Approve",
+      "es": "Approve",
+      "mg": "Approve",
+      "sw": "Approve"
     }
   ],
   "unused": [
