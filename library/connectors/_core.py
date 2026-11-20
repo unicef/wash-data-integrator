@@ -1,7 +1,7 @@
 """Shared core of the source-builder connectors: clean-up, column typing, place matching, output.
 
-Runs as a single file in the python runtime image (pandas, numpy, requests, openpyxl, xlrd and
-the standard library only). Connectors start with `from _core import *  # core-import`; the
+Runs as a single file in the python runtime image (pandas, numpy, geopandas, requests, openpyxl,
+xlrd and the standard library only). Connectors start with `from _core import *  # core-import`; the
 build drops that line and prepends this file, so nothing here may rely on the module name.
 """
 import io
@@ -17,7 +17,7 @@ import requests
 __all__ = [
     "normalise", "apply_cleanup", "apply_columns", "match_places", "read_places", "finish",
     "recipe_config", "UNMATCHED_LIMIT", "PREVIEW_ROWS", "http_get", "read_tabular", "fetch_table",
-    "cap_rows", "process", "unpivot_columns", "table_kind", "http_json", "row_limit",
+    "cap_rows", "process", "unpivot_columns", "table_kind", "http_json", "row_limit", "same_origin",
 ]
 
 UNMATCHED_LIMIT = 50
@@ -29,7 +29,7 @@ DROPPED_WORDS = {"region", "district", "province", "county", "state", "gobolka",
 def normalise(name):
     """Place-name key shared with the TypeScript matcher (see normalise_cases.json)."""
     text = unicodedata.normalize("NFKD", "" if name is None else str(name))
-    text = "".join(ch for ch in text if not unicodedata.combining(ch)).lower()
+    text = "".join(ch for ch in text if not unicodedata.category(ch).startswith("M")).lower()
     text = re.sub(r"[^a-z0-9]+", " ", text)
     return " ".join(w for w in text.split() if w not in DROPPED_WORDS)
 
@@ -220,10 +220,21 @@ def _safe_url(url):
     return f"{parts.scheme}://{parts.netloc}{parts.path}"
 
 
+def _origin(url):
+    """(scheme, host:port) of a URL: a key goes only to the exact origin it was meant for."""
+    parts = urlparse(str(url))
+    return (parts.scheme.lower(), parts.netloc.lower())
+
+
+def same_origin(a, b):
+    """True when two URLs share scheme, host and port."""
+    return _origin(a) == _origin(b)
+
+
 def http_get(url, same_host_only=False, **kwargs):
     """GET with a timeout; a non-2xx answer raises a clear error. Headers (which may hold secrets)
     are never printed. With same_host_only (keyed requests) redirects are followed by hand and one
-    to another host fails, so a key is never sent elsewhere."""
+    to another host or scheme (https to http) fails, so a key is never sent elsewhere or in clear."""
     def fetch(target):
         try:
             if same_host_only:
@@ -240,10 +251,10 @@ def http_get(url, same_host_only=False, **kwargs):
         if not location or hops >= 5:
             raise RuntimeError(f"Too many redirects from {_safe_url(url)}")
         target = requests.compat.urljoin(current, location)
-        if urlparse(target).netloc != urlparse(url).netloc:
+        if _origin(target) != _origin(url):
             raise RuntimeError(
-                f"{_safe_url(url)} redirected to another host ({urlparse(target).netloc}); "
-                "the API key was not sent there")
+                f"{_safe_url(url)} redirected to another host or scheme "
+                f"({urlparse(target).scheme}://{urlparse(target).netloc}); the API key was not sent there")
         current, hops = target, hops + 1
         response = fetch(current)
     if not 200 <= response.status_code < 300:

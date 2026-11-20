@@ -157,3 +157,17 @@ test("recipe_validation_rejects_bad_input", async () => {
   const r = recipe(); r.connectorVersion = 0
   await assert.rejects(buildDefinition(input(r), LIBRARY), /version/i)
 })
+
+test("key_requires_https_url", async () => {
+  const r = recipe({ source: { url: "http://x.org/api", auth: "key" } }, "web_api")
+  await assert.rejects(buildDefinition(input(r), LIBRARY), /A key can only be sent over https\./)
+  const open = recipe({ source: { url: "http://x.org/api", auth: "none" } }, "web_api")
+  await buildDefinition(input(open), LIBRARY)
+})
+
+test("places_column_must_be_a_place_column", async () => {
+  const p = (column: string) => ({ places: { column, table: "t", nameColumn: "name", codeColumn: "code", matches: {} } })
+  await assert.rejects(buildDefinition(input(recipe(p("cases"))), LIBRARY), /must be a column of type place/)
+  await assert.rejects(buildDefinition(input(recipe(p("nope"))), LIBRARY), /must be a column of type place/)
+  await buildDefinition(input(recipe(p("region")), { places: { inputId: "places", tableId: "t" } }), LIBRARY)
+})

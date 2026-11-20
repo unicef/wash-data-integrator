@@ -3,8 +3,13 @@ import { assertNoSecretLikeKeys, ID_PATTERN } from "../install.js"
 import { CONNECTORS, connectorCode } from "./connectors.js"
 
 const MAX_MATCHES = 5000
+/** The input id a places table is declared under (the connectors read it by this name). */
+export const PLACES_INPUT = "places"
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v)
+const isHttps = (v: unknown) => {
+  try { return new URL(String(v)).protocol === "https:" } catch { return false }
+}
 const hasText = (v: unknown) => typeof v === "string" && v.trim() !== ""
 
 /** Throws a user-readable Error when the recipe cannot be built or run. */
@@ -64,6 +69,7 @@ export function validateRecipe(recipe: Recipe, run?: "inspect" | "preview"): voi
       need("url")
       if (s.recordsPath !== undefined && typeof s.recordsPath !== "string") throw new Error("The records path must be text.")
       if (s.auth !== undefined && s.auth !== "none" && s.auth !== "key") throw new Error('Authentication must be "none" or "key".')
+      if (s.auth === "key" && !isHttps(s.url)) throw new Error("A key can only be sent over https.")
       break
     case "webhook":
       if (!isObject(s.sampleMessage)) throw new Error("The source needs a sample message.")
@@ -77,6 +83,10 @@ export function validateRecipe(recipe: Recipe, run?: "inspect" | "preview"): voi
   if (c.writeMode === "merge" && !inspect) {
     if (!hasText(c.mergeKey)) throw new Error("Choose a key column to merge on.")
     // The final table is checked in buildDefinition: the key may be a place code or the unpivot date column
+  }
+  if (c.places && !inspect) {
+    const col = c.columns.find((x) => x.id === c.places?.column)
+    if (!col || col.type !== "place") throw new Error(`The place column "${c.places.column}" must be a column of type place.`)
   }
   if (c.places && isObject(c.places.matches) && Object.keys(c.places.matches).length > MAX_MATCHES) {
     throw new Error(`At most ${MAX_MATCHES} place matches are allowed.`)

@@ -1,5 +1,4 @@
 from _core import *  # core-import
-from urllib.parse import urlparse
 import pandas as pd
 
 MAX_PAGES = 200
@@ -32,14 +31,14 @@ def run(ctx):
         headers[header] = f"Bearer {key}" if header.lower() == "authorization" else key
     paging = source.get("paging") or {"type": "none"}
     url, params = source["url"], {}
-    home = urlparse(url).netloc
+    home = url
     if paging["type"] == "page":
         page = int(paging.get("start", 1))
         params[paging.get("param", "page")] = page
     limit = row_limit(cfg)
     records = []
     for _ in range(MAX_PAGES):
-        response = http_get(url, same_host_only=keyed and urlparse(url).netloc == home,
+        response = http_get(url, same_host_only=bool(headers) and same_origin(url, home),
                             headers=headers, params=params or None)
         body = http_json(response)
         items = _records(body, source.get("recordsPath"))
@@ -53,8 +52,8 @@ def run(ctx):
             url, params = _dig(body, paging.get("path", "links.next")), {}
             if not url:
                 break
-            if keyed and urlparse(url).netloc != home:
-                headers = {}  # never send the key to another host
+            if keyed and not same_origin(url, home):
+                headers = {}  # never send the key to another host or over a different scheme
         else:
             break
         if limit and len(records) >= limit:

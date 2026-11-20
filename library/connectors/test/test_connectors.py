@@ -391,6 +391,32 @@ class FixRoundTests(Base):
         self.assertEqual(g.call_count, 1)
         self.assertFalse(g.call_args.kwargs["allow_redirects"])
 
+    def test_key_not_sent_on_https_to_http_next_link_same_host(self):
+        sent = []
+
+        def fake(url, **kw):
+            sent.append((url, dict(kw.get("headers") or {})))
+            if url.startswith("http://"):
+                return Resp(fixture("api_p2.json"))
+            body = json.loads(fixture("api_p1.json"))
+            body["links"]["next"] = "http://api.example.org/v1?page=2"
+            return Resp(json.dumps(body).encode())
+        ctx = self.ctx(WebApiTests().cfg(auth="key"), secrets={"api_key": "s3cret"})
+        with mock.patch("requests.get", side_effect=fake):
+            self.connector("web_api").run(ctx)
+        self.assertIn("Authorization", sent[0][1])
+        self.assertEqual(sent[1][0], "http://api.example.org/v1?page=2")
+        self.assertEqual(sent[1][1], {})
+
+    def test_https_to_http_redirect_same_host_fails_without_leaking(self):
+        r = Resp(b"", status=301)
+        r.headers["Location"] = "http://api.example.org/v1"
+        ctx = self.ctx(WebApiTests().cfg(auth="key", paging={"type": "none"}), secrets={"api_key": "s3cret"})
+        with mock.patch("requests.get", return_value=r) as g:
+            with self.assertRaisesRegex(RuntimeError, "another host or scheme"):
+                self.connector("web_api").run(ctx)
+        self.assertEqual(g.call_count, 1)
+
     def test_error_message_strips_query_string(self):
         ctx = self.ctx({"source": {"url": "https://x.org/a.csv?token=abc"}, "columns": COLS})
         with mock.patch("requests.get", return_value=Resp(b"", status=500)):
