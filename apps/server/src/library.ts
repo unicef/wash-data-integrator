@@ -54,6 +54,8 @@ export interface LibraryEntry {
   origin: "shipped" | "built"
   /** Review state of a built entry (proposed ones are listed to admins only) */
   builtStatus?: "proposed" | "approved" | "rejected"
+  /** Built entries: the connector the entry uses */
+  connector?: string
   /** Built entries: the installed copy differs from the approved entry */
   changedHere?: boolean
   /** Built entries, admins only: a new version waits for approval */
@@ -247,6 +249,7 @@ export async function listLibrary(
       status: !current ? "not_installed" : !recipe || behind ? "update_available" : "installed",
       installedVersion: current?.version ?? null,
       origin: "built",
+      connector: row.definition.recipe.connector,
       builtStatus: row.status,
       ...(current ? { changedHere: builtComparableJson(current.definition) !== builtComparableJson(row.definition) } : {}),
       ...(isAdmin && row.pending ? { pendingVersion: true } : {})

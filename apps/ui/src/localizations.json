@@ -9601,6 +9601,15 @@
       "es": "Approve",
       "mg": "Approve",
       "sw": "Approve"
+    },
+    {
+      "_base": "en",
+      "en": "Change the schedule on the source page",
+      "fr": "Change the schedule on the source page",
+      "pt": "Change the schedule on the source page",
+      "es": "Change the schedule on the source page",
+      "mg": "Change the schedule on the source page",
+      "sw": "Change the schedule on the source page"
     }
   ],
   "unused": [

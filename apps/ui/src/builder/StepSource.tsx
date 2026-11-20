@@ -40,12 +40,13 @@ export function StepSource({ model }: { model: BuilderModel }) {
 
   function setName(name: string) {
     // The id follows the name until someone edits it on the Name step
-    const followsName = work.id === "" || work.id === suggestId(work.name)
+    const followsName = !model.editing && (work.id === "" || work.id === suggestId(work.name))
     update({ name, ...(followsName ? { id: suggestId(name) } : {}) })
   }
 
   function pickConnector(connector: ConnectorId) {
-    if (connector === work.connector) return
+    // An installed source keeps its connector
+    if (connector === work.connector || model.editing) return
     // Settings of another connector do not carry over
     update({
       connector,

@@ -285,7 +285,7 @@ export function Library({ user, installId }: LibraryProps) {
     try {
       const result = await installLibraryEntry(entry.id, runNow)
       // A built source arrives without a schedule (the schedule is the deployment's), unless it takes pushed data
-      const needsSchedule = entry.origin === "built" && entry.status === "not_installed" && !entry.trigger.webhook
+      const needsSchedule = entry.origin === "built" && entry.status === "not_installed" && !entry.trigger.webhook && entry.connector !== "upload"
       setInstalled({ id: entry.id, version: result.version, ran: result.runId !== null, needsSchedule })
       setConfirming(null)
       refresh()

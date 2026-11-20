@@ -24,6 +24,8 @@ import { RasterStore } from "../rasterStore.js"
 import { cleanupScratch, draftSchema } from "../scratch.js"
 import { getDraftSecrets, getSecrets, listDraftSecrets, loadSecretKey, MissingSecretError, setDraftSecret, setSecret } from "../secrets.js"
 import { buildDefinition, validateRecipe } from "./buildDefinition.js"
+import { CONNECTORS } from "./connectors.js"
+import type { ConnectorRegistry } from "../library.js"
 import { checkLink, Resolver } from "./linkSafety.js"
 import { suggestMatches } from "./places.js"
 
@@ -76,6 +78,8 @@ export interface DraftState {
   recipe?: Recipe
   /** Set by the server when the draft edits an installed source: accepting updates that one integration */
   editing?: string
+  /** Set by the server while the draft's key is the installed source's copied key (dropped if the source's host changes) */
+  keyCopied?: boolean
 }
 
 /** One builder draft as its routes see it. */
@@ -95,6 +99,8 @@ export interface BuilderOptions {
   executor: ExecutorDeps | null
   /** Host name resolver for link checks; tests inject one */
   resolve?: Resolver
+  /** Connector registry; tests inject one with newer versions (defaults to CONNECTORS) */
+  connectors?: ConnectorRegistry
   /** Test hook: runs between the id check and the install of an accept */
   beforeInstall?: (id: string) => Promise<void>
 }
@@ -178,11 +184,17 @@ export class BuilderService {
     if (typeof editing === "string") {
       state.editing = editing
       state.id = editing
+      if (existing.rows[0].client_state.keyCopied === true) state.keyCopied = true
+      // An edit keeps the connector version the source was installed with
+      const installed = await this.pool.query("SELECT definition->'recipe'->'connectorVersion' AS version FROM app.integrations WHERE id = $1", [editing])
+      const version = installed.rows[0]?.version
+      if (state.recipe && typeof version === "number") (state.recipe as Record<string, unknown>).connectorVersion = version
     }
     await this.pool.query("UPDATE app.agent_sessions SET client_state = $2, updated_at = now() WHERE id = $1", [
       id,
       JSON.stringify(state)
     ])
+    await this.dropCopiedKeyOnHostChange(id)
     return state as DraftState
   }
 
@@ -197,6 +209,8 @@ export class BuilderService {
     if (row.rows.length === 0) throw new BuilderError(404, "unknown integration")
     const definition = row.rows[0].definition as IntegrationDefinition
     if (!definition.recipe) throw new BuilderError(400, "Only sources made with the builder can be edited in the builder.")
+    const info = (this.options.connectors ?? CONNECTORS)[definition.recipe.connector]
+    if (info && definition.recipe.connectorVersion < info.version) throw new BuilderError(409, "Apply the connector update first.")
     const { mode: _mode, ...config } = definition.recipe.config as unknown as Record<string, unknown>
     void _mode
     const state: DraftState = {
@@ -206,7 +220,8 @@ export class BuilderService {
       source: definition.source as SourceInfo,
       trigger: definition.trigger,
       recipe: { ...definition.recipe, config: config as unknown as Recipe["config"] },
-      editing: integrationId
+      editing: integrationId,
+      ...(definition.secrets?.includes(KEY_NAME) ? { keyCopied: true } : {})
     }
     const created = await this.pool.query(
       `INSERT INTO app.agent_sessions (kind, user_id, status, client_state) VALUES ('builder', $1, 'active', $2) RETURNING id`,
@@ -223,6 +238,7 @@ export class BuilderService {
 
   /** Runs the connector in inspect mode and returns its inspect.json: columns with samples, and the row count. */
   async inspect(draft: Draft): Promise<unknown> {
+    await this.dropCopiedKeyOnHostChange(draft.id)
     const definition = await this.runDefinition(draft, "inspect")
     let inspected: unknown = null
     const status = await this.run(draft, definition, async outDir => {
@@ -236,6 +252,7 @@ export class BuilderService {
 
   /** Runs the connector in preview mode into the draft schema and reports the first rows and the counts. */
   async preview(draft: Draft): Promise<PreviewResult> {
+    await this.dropCopiedKeyOnHostChange(draft.id)
     const definition = await this.runDefinition(draft, "preview")
     const outcome = await this.run(draft, definition)
     if (outcome.status !== "succeeded") throw new BuilderError(422, `The preview failed: ${outcome.error ?? outcome.status}`)
@@ -281,6 +298,37 @@ export class BuilderService {
       throw new BuilderError(400, "The key must be 1 to 65536 characters.")
     }
     await setDraftSecret(this.pool, this.secretKey(), draft.id, KEY_NAME, value)
+    // An admin's own key for this draft is no longer the copied one
+    await this.pool.query(
+      "UPDATE app.agent_sessions SET client_state = client_state - 'keyCopied' WHERE id = $1 AND client_state ? 'keyCopied'",
+      [draft.id]
+    )
+  }
+
+  /**
+   * An edit draft keeps the installed source's copied key only while every
+   * source address (url, layerUrl) stays on the installed source's host;
+   * otherwise the key is deleted, so no other host ever receives it.
+   */
+  private async dropCopiedKeyOnHostChange(draftId: string): Promise<void> {
+    const row = await this.pool.query("SELECT client_state FROM app.agent_sessions WHERE id = $1", [draftId])
+    const state = (row.rows[0]?.client_state ?? {}) as DraftState
+    if (!state.editing || state.keyCopied !== true) return
+    const installed = await this.pool.query("SELECT definition FROM app.integrations WHERE id = $1", [state.editing])
+    const before = (installed.rows[0]?.definition as IntegrationDefinition | undefined)?.recipe?.config?.source ?? {}
+    const after = state.recipe?.config?.source ?? {}
+    const host = (value: unknown): string | null => {
+      if (value === undefined || value === null || value === "") return null
+      try {
+        return new URL(String(value)).hostname.toLowerCase()
+      } catch {
+        return "invalid:" + String(value)
+      }
+    }
+    const same = ["url", "layerUrl"].every(field => host(after[field]) === null || host(after[field]) === host(before[field]))
+    if (same) return
+    await this.pool.query("DELETE FROM app.draft_secrets WHERE session_id = $1 AND name = $2", [draftId, KEY_NAME])
+    await this.pool.query("UPDATE app.agent_sessions SET client_state = client_state - 'keyCopied' WHERE id = $1", [draftId])
   }
 
   /** The draft's secret names and update times, never values. */
@@ -304,6 +352,7 @@ export class BuilderService {
       held.push(draftLock)
       const fresh = await this.find(draft.id, user)
       if (!fresh) throw new BuilderError(404, "unknown draft")
+      await this.dropCopiedKeyOnHostChange(fresh.id)
       const { id, recipe } = fresh.state
       if (!id) throw new BuilderError(400, "Give the source an id before accepting it.")
       if (!recipe) throw new BuilderError(400, "Choose a connector before accepting the source.")
@@ -329,11 +378,17 @@ export class BuilderService {
     }
     const editing = draft.state.editing
     let installed: IntegrationDefinition | null = null
+    let installedStatus: "draft" | "ready" = "ready"
+    let installedEnabled = true
     if (editing) {
       if (editing !== id) throw new BuilderError(400, "An edited source keeps its id.")
-      const row = await this.pool.query("SELECT definition FROM app.integrations WHERE id = $1", [editing])
+      const row = await this.pool.query("SELECT definition, status, enabled FROM app.integrations WHERE id = $1", [editing])
       installed = (row.rows[0]?.definition as IntegrationDefinition | undefined) ?? null
       if (!installed?.recipe) throw new BuilderError(409, "The source being edited is no longer installed.")
+      installedStatus = row.rows[0].status
+      installedEnabled = row.rows[0].enabled
+      const info = (this.options.connectors ?? CONNECTORS)[installed.recipe.connector]
+      if (info && installed.recipe.connectorVersion < info.version) throw new BuilderError(409, "Apply the connector update first.")
       if (installed.recipe.connector !== recipe.connector) throw new BuilderError(400, "The connector of an installed source cannot be changed.")
     } else if (await idTaken(this.pool, this.options.libraryPath, id)) {
       throw new BuilderError(409, `The id "${id}" is already used by another source.`)
@@ -393,14 +448,14 @@ export class BuilderService {
       }
       definition = owned as unknown as IntegrationDefinition
       try {
-        await installIntegration(this.pool, definition, "ready", draft.userId ?? userId)
+        await installIntegration(this.pool, definition, installedStatus, draft.userId ?? userId)
         for (const [secretName, value] of Object.entries(secrets)) await setSecret(this.pool, key!, id, secretName, value)
         if (Object.keys(pins).length > 0) await adoptSessionFiles(this.pool, draft.id, id, Object.values(pins))
       } catch (err) {
         if (err instanceof BuilderError) throw err
         throw new BuilderError(400, err instanceof Error ? err.message : String(err))
       }
-      return this.finishAccept(draft, id, definition, pins)
+      return this.finishAccept(draft, id, definition, pins, installedEnabled)
     }
 
     await this.options.beforeInstall?.(id)
@@ -438,14 +493,15 @@ export class BuilderService {
     draft: Draft,
     id: string,
     definition: IntegrationDefinition,
-    pins: Record<string, string>
+    pins: Record<string, string>,
+    queueRun = true
   ): Promise<AcceptResult> {
     const slotIds = Object.keys(pins)
     const result: AcceptResult = { integrationId: id }
     if (definition.trigger.webhook) {
       const token = await getWebhookToken(this.pool, id)
       if (token) result.webhookUrl = `/hooks/${token}`
-    } else {
+    } else if (queueRun) {
       try {
         const queued = await this.pool.query(
           `INSERT INTO app.runs (integration_id, trigger, status, file_pins) VALUES ($1, 'manual', 'queued', $2::jsonb) RETURNING id`,

@@ -5,6 +5,7 @@
  */
 import { useState } from "react"
 import { CronDraft, CronEditor, fromCronDraft, toCronDraft } from "../CronEditor.js"
+import { cronText } from "../localization.js"
 import { Field, StepNav } from "./shared.js"
 import { BuilderModel, ID_PATTERN, usePending, Work } from "./useBuilderDraft.js"
 
@@ -27,7 +28,7 @@ export function StepSchedule({ model }: { model: BuilderModel }) {
   const scheduled = work.connector !== "upload" && work.connector !== "webhook"
 
   /** The step's fields; the schedule only once it was chosen here or saved before. */
-  const patch = (chosen = cronTouched || work.scheduleSet): Partial<Work> => ({
+  const patch = (chosen = !model.editing && (cronTouched || work.scheduleSet)): Partial<Work> => ({
     name,
     id: id.trim(),
     provider,
@@ -57,11 +58,16 @@ export function StepSchedule({ model }: { model: BuilderModel }) {
         <input type="text" value={name} onChange={e => setName(e.target.value)} />
       </Field>
       <Field label={T`Table name`} help={T`The name of the table the data is saved in. Lowercase letters, digits and underscores. It cannot change later.`}>
-        <input type="text" value={id} onChange={e => setId(e.target.value)} />
+        <input type="text" value={id} readOnly={!!model.editing} onChange={e => setId(e.target.value)} />
       </Field>
 
       <h3>{T`How often it refreshes`}</h3>
-      {work.connector === "upload" ? (
+      {model.editing ? (
+        <p>
+          {work.cron ? cronText(work.cron) : T`Manual only`}{" "}
+          <a href={`#/integration/${model.editing}`}>{T`Change the schedule on the source page`}</a>
+        </p>
+      ) : work.connector === "upload" ? (
         <p>{T`Runs when a new file is uploaded.`}</p>
       ) : work.connector === "webhook" ? (
         <p>{T`Runs when data arrives.`}</p>

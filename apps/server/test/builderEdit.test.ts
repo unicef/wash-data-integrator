@@ -16,6 +16,7 @@ import { TileRenderer } from "../src/tiles.js"
 import { RasterStore } from "../src/rasterStore.js"
 import { FileStore } from "../src/fileStore.js"
 import { installIntegration } from "../src/install.js"
+import { CONNECTORS } from "../src/builder/connectors.js"
 import { getSecrets } from "../src/secrets.js"
 import { BuilderOptions, BuilderService } from "../src/builder/drafts.js"
 import { startTestDb, TestDb } from "./helpers/pg.js"
@@ -101,7 +102,7 @@ test("edit_draft_copies_the_installed_source_and_accept_updates_it", async () =>
   const first = await newDraft()
   await saveDraft(first, draftState("edit_cases", "sheet_link", { url: "https://data.example.org/a.csv" }))
   assert.equal((await accept(first)).status, 200)
-  await pool.query("UPDATE app.integrations SET definition = jsonb_set(definition, '{trigger}', '{\"schedule\":\"0 6 * * *\"}') WHERE id = 'edit_cases'")
+  await pool.query("UPDATE app.integrations SET definition = jsonb_set(definition, '{trigger}', '{\"cron\":\"0 6 * * *\"}') WHERE id = 'edit_cases'")
 
   const opened = await edit("edit_cases")
   assert.equal(opened.status, 201, await opened.clone().text())
@@ -122,7 +123,7 @@ test("edit_draft_copies_the_installed_source_and_accept_updates_it", async () =>
   assert.equal(row.rows[0].version, 2)
   assert.equal(row.rows[0].definition.recipe.config.source.url, "https://data.example.org/b.csv")
   // The schedule is the deployment's and stays
-  assert.equal(row.rows[0].definition.trigger.schedule, "0 6 * * *")
+  assert.equal(row.rows[0].definition.trigger.cron, "0 6 * * *")
   assert.equal((await pool.query("SELECT 1 FROM app.integrations WHERE id = 'somewhere_else'")).rows.length, 0)
 })
 
@@ -144,6 +145,100 @@ test("edit_cannot_change_the_connector", async () => {
   const draftId = ((await (await edit("edit_conn")).json()) as { id: string }).id
   await saveDraft(draftId, draftState("edit_conn", "hdx", { url: "https://data.example.org/d", resourceId: "r" }))
   assert.equal((await accept(draftId)).status, 400)
+})
+
+/** A keyed web_api source installed with an admin's key, and an edit draft of it. */
+async function keyedEdit(id: string): Promise<string> {
+  const first = await newDraft()
+  await saveDraft(first, draftState(id, "web_api", { url: "https://data.example.org/api", auth: "key" }))
+  const set = await call(`/api/builder/drafts/${first}/secrets/api_key`, admin, { method: "PUT", body: JSON.stringify({ value: "s3cret-value-123" }) })
+  assert.equal(set.status, 200)
+  assert.equal((await accept(first)).status, 200)
+  const opened = await edit(id)
+  assert.equal(opened.status, 201, await opened.clone().text())
+  return ((await opened.json()) as { id: string }).id
+}
+
+const keyRows = async (draftId: string) =>
+  (await pool.query("SELECT 1 FROM app.draft_secrets WHERE session_id = $1", [draftId])).rows.length
+
+async function withUrl(draftId: string, url: string): Promise<void> {
+  const got = (await (await call(`/api/builder/drafts/${draftId}`, editor)).json()) as { state: Record<string, any> }
+  const state = got.state
+  state.recipe.config.source = { ...state.recipe.config.source, url }
+  await saveDraft(draftId, state)
+}
+
+test("edit_draft_url_host_change_drops_key", async () => {
+  const draftId = await keyedEdit("edit_key_a")
+  assert.equal(await keyRows(draftId), 1)
+  HOSTS["evil.example.net"] = ["93.184.215.15"]
+  await withUrl(draftId, "https://evil.example.net/api")
+  assert.equal(await keyRows(draftId), 0)
+  const preview = await call(`/api/builder/drafts/${draftId}/preview`, editor, { method: "POST", body: "{}" })
+  assert.equal(preview.status, 409)
+  assert.match(((await preview.json()) as { error: string }).error, /Waiting for an admin to add the key/)
+  // Going back to the old host does not bring the key back
+  await withUrl(draftId, "https://data.example.org/api")
+  assert.equal(await keyRows(draftId), 0)
+})
+
+test("edit_draft_same_host_keeps_key", async () => {
+  const draftId = await keyedEdit("edit_key_b")
+  await withUrl(draftId, "https://data.example.org/other/path")
+  assert.equal(await keyRows(draftId), 1)
+})
+
+test("edit_accept_after_host_change_needs_admin_key", async () => {
+  const draftId = await keyedEdit("edit_key_c")
+  HOSTS["evil.example.net"] = ["93.184.215.15"]
+  await withUrl(draftId, "https://evil.example.net/api")
+  const refused = await accept(draftId)
+  assert.equal(refused.status, 409)
+  assert.match(((await refused.json()) as { error: string }).error, /Waiting for an admin/)
+  // An admin's own key for the draft is kept and lets the accept through
+  const set = await call(`/api/builder/drafts/${draftId}/secrets/api_key`, admin, { method: "PUT", body: JSON.stringify({ value: "new-key-456789" }) })
+  assert.equal(set.status, 200)
+  await withUrl(draftId, "https://evil.example.net/api2")
+  assert.equal(await keyRows(draftId), 1)
+  assert.equal((await accept(draftId)).status, 200)
+  assert.equal((await getSecrets(pool, key, "edit_key_c", ["api_key"])).api_key, "new-key-456789")
+})
+
+test("edit_is_refused_while_a_connector_update_is_pending_and_keeps_the_version", async () => {
+  const first = await newDraft()
+  await saveDraft(first, draftState("edit_ver", "sheet_link", { url: "https://data.example.org/a.csv" }))
+  assert.equal((await accept(first)).status, 200)
+  const real = builderOptions.connectors
+  builderOptions.connectors = { ...CONNECTORS, sheet_link: { ...CONNECTORS.sheet_link, version: 2 } }
+  try {
+    const refused = await edit("edit_ver")
+    assert.equal(refused.status, 409)
+    assert.match(((await refused.json()) as { error: string }).error, /Apply the connector update first/)
+  } finally {
+    builderOptions.connectors = real
+  }
+  // The draft's recipe keeps the installed version even if a client sends another
+  const draftId = ((await (await edit("edit_ver")).json()) as { id: string }).id
+  const got = (await (await call(`/api/builder/drafts/${draftId}`, editor)).json()) as { state: Record<string, any> }
+  await saveDraft(draftId, { ...got.state, recipe: { ...got.state.recipe, connectorVersion: 7 } })
+  const saved = (await (await call(`/api/builder/drafts/${draftId}`, editor)).json()) as { state: Record<string, any> }
+  assert.equal(saved.state.recipe.connectorVersion, 1)
+})
+
+test("edit_accept_keeps_status_and_queues_no_run_when_paused", async () => {
+  const first = await newDraft()
+  await saveDraft(first, draftState("edit_paused", "sheet_link", { url: "https://data.example.org/a.csv" }))
+  assert.equal((await accept(first)).status, 200)
+  await pool.query("UPDATE app.integrations SET enabled = false, status = 'draft' WHERE id = 'edit_paused'")
+  await pool.query("DELETE FROM app.runs WHERE integration_id = 'edit_paused'")
+  const draftId = ((await (await edit("edit_paused")).json()) as { id: string }).id
+  const response = await accept(draftId)
+  assert.equal(response.status, 200, await response.clone().text())
+  assert.equal(((await response.json()) as { runId?: string }).runId, undefined)
+  const row = await pool.query("SELECT status, enabled FROM app.integrations WHERE id = 'edit_paused'")
+  assert.deepEqual(row.rows[0], { status: "draft", enabled: false })
+  assert.equal((await pool.query("SELECT 1 FROM app.runs WHERE integration_id = 'edit_paused'")).rows.length, 0)
 })
 
 test("integration_detail_lists_unmatched_places_of_a_run", async () => {

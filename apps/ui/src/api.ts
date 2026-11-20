@@ -1469,6 +1469,8 @@ export interface LibraryEntry {
   origin: "shipped" | "built"
   /** Review state of a built entry (proposed ones are listed to admins only) */
   builtStatus?: "proposed" | "approved" | "rejected"
+  /** Built entries: the connector the entry uses */
+  connector?: string
   /** Built entries: the installed copy differs from the approved entry */
   changedHere?: boolean
   /** Built entries, admins only: a new version waits for approval */

@@ -41,6 +41,8 @@ export interface Work {
   /** Display name, in the current language */
   name: string
   connector: ConnectorId | null
+  /** Connector version an edited source was installed with; null for a new source (the builder writes its own) */
+  connectorVersion: number | null
   /** Connector settings (recipe.config.source) */
   source: Record<string, unknown>
   columns: RecipeColumn[]
@@ -136,6 +138,7 @@ function fromState(state: BuilderState): Work {
     id: state.id ?? "",
     name: nameText(state.name),
     connector: state.recipe?.connector ?? null,
+    connectorVersion: state.editing ? state.recipe?.connectorVersion ?? null : null,
     source: config?.source ?? {},
     columns: config?.columns ?? [],
     cleanup: config?.cleanup ?? {},
@@ -172,7 +175,7 @@ export function toState(work: Work): BuilderState {
     const config: RecipeConfig = { source: work.source, columns: work.columns, cleanup: work.cleanup, writeMode }
     if (writeMode === "merge" && work.mergeKey) config.mergeKey = work.mergeKey
     if (work.places) config.places = work.places
-    state.recipe = { connector: work.connector, connectorVersion: CONNECTOR_VERSION, config }
+    state.recipe = { connector: work.connector, connectorVersion: work.connectorVersion ?? CONNECTOR_VERSION, config }
   }
   return state
 }
