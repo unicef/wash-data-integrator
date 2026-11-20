@@ -116,8 +116,17 @@ async function sweepBuilderDrafts(pool: pg.Pool, store: RasterStore, workRoot: s
        AND NOT EXISTS (SELECT 1 FROM app.runs r WHERE r.session_id = s.id AND r.status IN ('queued', 'running'))`,
     [DRAFT_MAX_AGE_HOURS]
   )
-  for (const { id } of stale.rows as { id: string }[]) await deleteBuilderDraft(pool, store, workRoot, id)
-  return stale.rows.length
+  let removed = 0
+  for (const { id } of stale.rows as { id: string }[]) {
+    // One draft that cannot be removed must not stop the rest of the sweep
+    try {
+      await deleteBuilderDraft(pool, store, workRoot, id)
+      removed++
+    } catch (err) {
+      console.warn(`housekeeping: builder draft ${id} not removed: ${err instanceof Error ? err.message : err}`)
+    }
+  }
+  return removed
 }
 
 /** Removes `<layer>/<snapshotId>/` directories with no raster_snapshots row, once old enough. */

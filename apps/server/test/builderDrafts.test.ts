@@ -233,6 +233,9 @@ test("check_link_rejects_unsafe_targets", async () => {
     "http://[fe80::1]/",
     "http://[fd12:3456::1]/",
     "http://[::ffff:10.0.0.1]/",
+    "http://[::10.0.0.1]/",
+    "http://[::ffff:0:a00:1]/",
+    "http://[64:ff9b::a00:1]/",
     "http://sneaky.example.org/a.csv",
     "http://unknown.invalid/"
   ]) {
@@ -242,7 +245,15 @@ test("check_link_rejects_unsafe_targets", async () => {
 
 test("refuses_private_links", async () => {
   const id = await newDraft()
-  for (const url of ["http://169.254.169.254/", "http://localhost:5432", "http://10.0.0.5/x.csv", "ftp://example.org/a.csv"]) {
+  for (const url of [
+    "http://169.254.169.254/",
+    "http://localhost:5432",
+    "http://10.0.0.5/x.csv",
+    "ftp://example.org/a.csv",
+    "http://[::10.0.0.1]/",
+    "http://[::ffff:0:a00:1]/",
+    "http://[64:ff9b::a9fe:a9fe]/"
+  ]) {
     await saveDraft(id, draftState("private_link", "sheet_link", { url }))
     for (const action of ["inspect", "preview"]) {
       const response = await call(`/api/builder/drafts/${id}/${action}`, editor, { method: "POST", body: "{}" })
@@ -374,6 +385,15 @@ test("upload_stages_in_the_draft", async () => {
     headers: { "content-type": "text/csv" }
   })
   assert.equal(refused.status, 404)
+  // The unread body must not be parsed as a next request on the same connection
+  assert.equal(refused.headers.get("connection"), "close")
+  const viewerUpload = await call(`/api/builder/drafts/${id}/files/data?filename=cases.csv`, viewer, {
+    method: "PUT",
+    body: "x",
+    headers: { "content-type": "text/csv" }
+  })
+  assert.equal(viewerUpload.status, 403)
+  assert.equal(viewerUpload.headers.get("connection"), "close")
 })
 
 test("preview_needs_an_id_and_a_buildable_recipe", async () => {
@@ -438,8 +458,19 @@ test("draft_cleanup_after_24h", async () => {
   }
   const stale = await make("25 hours")
   const fresh = await make("1 hour")
+  // A stale draft that cannot be removed (a webhook event pins its run) is skipped, not fatal
+  const stuck = await make("26 hours")
+  const stuckRun = await pool.query("SELECT id FROM app.runs WHERE session_id = $1", [stuck])
+  await pool.query(
+    "INSERT INTO app.webhook_events (integration_id, payload, run_id) VALUES ('som_admin_areas', '{}', $1)",
+    [stuckRun.rows[0].id]
+  )
   const result = await sweepHousekeeping(pool, store, workRoot)
-  assert.ok(result.builderDrafts >= 1)
+  assert.equal(result.builderDrafts, 1)
+  assert.equal(typeof result.orphanSnapshots, "number")
+  assert.equal(typeof result.leftoverJobTmp, "number")
+  assert.equal((await pool.query("SELECT 1 FROM app.agent_sessions WHERE id = $1", [stuck])).rows.length, 1)
+  await pool.query("DELETE FROM app.webhook_events WHERE run_id = $1", [stuckRun.rows[0].id])
   const schemaExists = async (id: string) =>
     (await pool.query("SELECT 1 FROM pg_namespace WHERE nspname = $1", [draftSchema(id)])).rows.length > 0
   assert.equal((await pool.query("SELECT 1 FROM app.agent_sessions WHERE id = $1", [stale])).rows.length, 0)

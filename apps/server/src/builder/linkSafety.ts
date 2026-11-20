@@ -15,8 +15,10 @@ BLOCKED.addSubnet("127.0.0.0", 8, "ipv4")
 BLOCKED.addSubnet("169.254.0.0", 16, "ipv4") // link-local, cloud metadata
 BLOCKED.addSubnet("172.16.0.0", 12, "ipv4")
 BLOCKED.addSubnet("192.168.0.0", 16, "ipv4")
-BLOCKED.addAddress("::", "ipv6")
-BLOCKED.addAddress("::1", "ipv6")
+// ::/96 holds ::, ::1 and the IPv4-compatible ::a.b.c.d form
+BLOCKED.addSubnet("::", 96, "ipv6")
+BLOCKED.addSubnet("::ffff:0:0:0", 96, "ipv6") // IPv4-translated
+BLOCKED.addSubnet("64:ff9b::", 96, "ipv6") // NAT64: reaches any IPv4 address through the gateway
 BLOCKED.addSubnet("fe80::", 10, "ipv6")
 BLOCKED.addSubnet("fc00::", 7, "ipv6")
 

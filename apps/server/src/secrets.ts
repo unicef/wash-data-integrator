@@ -182,7 +182,19 @@ export async function setDraftSecret(
   )
 }
 
-/** Fetches and decrypts a builder draft's named secrets; a missing name is an error. */
+/** A builder draft lacks a secret its source needs (an admin has not added it yet). */
+export class MissingSecretError extends Error {
+  /** The secret name that is not set */
+  readonly secretName: string
+
+  /** Creates the error for one missing name. */
+  constructor(name: string) {
+    super(`Secret ${name} is not set for this draft`)
+    this.secretName = name
+  }
+}
+
+/** Fetches and decrypts a builder draft's named secrets; a missing name throws MissingSecretError. */
 export async function getDraftSecrets(
   pool: pg.Pool,
   key: Buffer,
@@ -198,7 +210,7 @@ export async function getDraftSecrets(
   const secrets: Record<string, string> = {}
   for (const name of names) {
     const stored = found.get(name)
-    if (!stored) throw new Error(`Secret ${name} is not set for this draft`)
+    if (!stored) throw new MissingSecretError(name)
     secrets[name] = decryptSecret(key, stored)
   }
   return secrets

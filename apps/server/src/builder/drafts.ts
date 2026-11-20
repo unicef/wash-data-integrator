@@ -20,7 +20,7 @@ import { ID_PATTERN } from "../install.js"
 import { queryRows } from "../queryApi.js"
 import { RasterStore } from "../rasterStore.js"
 import { cleanupScratch, draftSchema } from "../scratch.js"
-import { getDraftSecrets, listDraftSecrets, loadSecretKey, setDraftSecret } from "../secrets.js"
+import { getDraftSecrets, listDraftSecrets, loadSecretKey, MissingSecretError, setDraftSecret } from "../secrets.js"
 import { buildDefinition, validateRecipe } from "./buildDefinition.js"
 import { checkLink, Resolver } from "./linkSafety.js"
 import { suggestMatches } from "./places.js"
@@ -299,7 +299,7 @@ export class BuilderService {
       try {
         secrets = await getDraftSecrets(this.pool, this.secretKey(), draft.id, definition.secrets)
       } catch (err) {
-        if (err instanceof Error && err.message.includes("is not set")) {
+        if (err instanceof MissingSecretError) {
           throw new BuilderError(409, "Waiting for an admin to add the key.")
         }
         throw err
@@ -469,6 +469,15 @@ export async function deleteBuilderDraft(
   }
 }
 
+/**
+ * Answers a refusal sent before the request body is read, closing the
+ * connection: an unread upload body must not be parsed as the next request.
+ */
+function refuse(res: ServerResponse, status: number, error: string): void {
+  res.setHeader("connection", "close")
+  json(res, status, { error })
+}
+
 /** Matches /api/builder/drafts/:id and its subresources. */
 const DRAFT_PATH =
   /^\/api\/builder\/drafts\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\/inspect|\/preview|\/places\/suggest|\/secrets|\/secrets\/api_key|\/files\/[^/]+)?$/
@@ -490,17 +499,17 @@ export async function routeBuilder(
 ): Promise<boolean> {
   if (!pathname.startsWith("/api/builder/")) return false
   if (user.role === "viewer") {
-    json(res, 403, { error: "Viewers cannot build sources" })
+    refuse(res, 403, "Viewers cannot build sources")
     return true
   }
   if (!builder) {
-    json(res, 503, { error: "The source builder is not available on this server" })
+    refuse(res, 503, "The source builder is not available on this server")
     return true
   }
   try {
     if (pathname === "/api/builder/drafts") {
       if (req.method !== "POST") {
-        json(res, 405, { error: "POST only" })
+        refuse(res, 405, "POST only")
         return true
       }
       json(res, 201, { id: await builder.create(user.id) })
@@ -508,18 +517,18 @@ export async function routeBuilder(
     }
     const match = pathname.match(DRAFT_PATH)
     if (!match) {
-      json(res, 404, { error: "not found" })
+      refuse(res, 404, "not found")
       return true
     }
     const [, draftId, sub] = match
     // Only admins write keys: refused before anything else is read
     if (sub === "/secrets/api_key" && user.role !== "admin") {
-      json(res, 403, { error: "Only admins can add keys" })
+      refuse(res, 403, "Only admins can add keys")
       return true
     }
     const draft = await builder.find(draftId, user)
     if (!draft) {
-      json(res, 404, { error: "unknown draft" })
+      refuse(res, 404, "unknown draft")
       return true
     }
     if (!sub && req.method === "GET") {
@@ -543,7 +552,7 @@ export async function routeBuilder(
     } else if (sub?.startsWith("/files/") && req.method === "PUT") {
       await handleSessionUpload(pool, files, user, req, res, draft.id, sub.slice("/files/".length), searchParams)
     } else {
-      json(res, 405, { error: "method not allowed" })
+      refuse(res, 405, "method not allowed")
     }
   } catch (err) {
     if (!(err instanceof BuilderError)) throw err
