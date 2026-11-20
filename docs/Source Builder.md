@@ -76,6 +76,17 @@ Some web services need a key. Only an admin can add a key; the builder shows
 encrypted and is never shown again or put into a library entry. A source that
 needs a key cannot be added until the key is in.
 
+- A key is only sent over **https**: a web address starting with `http://` is
+  refused for a source that needs a key.
+- A key is tied to the web address it was added for (its scheme, host and
+  port). If the address is later changed to another host, port or to `http`,
+  the key is removed and an admin has to add it again. This applies to a key an
+  admin added and to the key copied when you edit an installed source. Other
+  changes to the address on the same host, such as a different path, keep it.
+- The key is never sent to another host: a redirect to another host or to
+  `http` stops the run with an error, and a next-page link on another host is
+  read without the key.
+
 ## Data sent by a device or system
 
 Readings get the time they are processed, not the time the device measured
@@ -112,9 +123,16 @@ A source made here can be offered to the whole deployment:
    arrives.
 4. If you change a source that is already in the library and propose it again,
    the new version waits for approval and the approved one stays in use.
+5. When a new version is approved, every installed copy that was not changed
+   locally shows **Update available** in the Library. Updating installs the
+   new version's settings and keeps the copy's schedule, area of interest,
+   limits, setting values and key. A copy that was changed locally shows
+   **Changed here** instead and keeps its own settings.
 
 A library entry holds the recipe (the settings from the steps), never code, keys,
-the area of interest or the schedule.
+the area of interest or the schedule. When an entry is installed or imported,
+its table, inputs and other technical parts are rebuilt from the recipe, so
+only the name, description and source information come from the entry itself.
 
 ### Export and import
 

@@ -423,7 +423,7 @@ It holds no secrets and no code.
 |---|---|---|
 | `connector` | `"sheet_link"`, `"hdx"`, `"arcgis"`, `"web_api"`, `"upload"`, or `"webhook"` | The connector |
 | `connectorVersion` | integer, 1 or more | Version of the connector whose code the definition carries |
-| `config.source` | object | Connector settings: `url`, `sheet`, `resourceId`, `layerUrl`, `recordsPath`, `auth` (`"none"` or `"key"`), `sampleMessage` |
+| `config.source` | object | Connector settings: `url`, `sheet`, `resourceId`, `layerUrl`, `recordsPath`, `auth` (`"none"` or `"key"`), `keyHeader` (header the key is sent in; default `Authorization`, as `Bearer <key>`), `paging` (`{ type: "none" }`, `{ type: "page", param, start }` or `{ type: "next", path }`), `sampleMessage` |
 | `config.columns` | `[{ from, id, type, unit? }]` | Output columns: source column, identifier (2.1), and type `text`, `number`, `date`, or `place` |
 | `config.cleanup` | object | `skipRows`, `headerRow`, `filters` (`equals` or `contains`), `unpivot` (`columns`, `dateColumnId`, `valueColumnId`) |
 | `config.places` | object | `column`, `table`, `nameColumn`, `codeColumn`, and `matches` (source name to place code, at most 5000) |
@@ -431,7 +431,10 @@ It holds no secrets and no code.
 
 A place column writes a second column, `<id>_code`. `config.mode` (`preview`
 or `inspect`) is set only on a builder draft's scratch runs; a definition that
-carries it is refused. A `key` source declares the secret `api_key`.
+carries it is refused. A `key` source declares the secret `api_key`, and its
+`url` must use `https`: a key is never sent over plain http. The key is sent
+only to the origin (scheme, host and port) of `url`; a redirect to another
+origin fails, and a `next` page link on another origin is read without the key.
 
 A connector version applies only when asked for: an installed source whose
 `connectorVersion` is behind the connector's current one is offered an update,
@@ -652,7 +655,10 @@ to 3.5; the reference implementation keeps one suite per runtime image.
 A source with a `recipe` (2.14) can be proposed as a library entry. The
 deployment stores it without `code`, `aoi`, `trigger`, `limits`, and
 `settingValues`; the code is the connector's, inlined again on install, and the
-schedule is the installing deployment's. A fresh install therefore has no
+schedule is the installing deployment's. On import and on install the
+definition is rebuilt from the recipe: destinations, inputs, files, secrets,
+runtime and trigger come from the recipe and the connector, and only `id`,
+`name`, `description` and `source` are taken from the stored entry. A fresh install therefore has no
 schedule, except a `webhook` source, which runs when data arrives.
 
 An entry has a status: `proposed`, `approved`, or `rejected`. Only an admin
@@ -662,6 +668,12 @@ version and replaces the approved one only on approval. A shipped entry always
 wins its id, and an id used by an installed integration that has no recipe is
 refused. A secret-like key in `source` makes a definition invalid on propose,
 approve, export and import.
+
+An installed copy remembers the entry version it was installed from. It shows
+an update when a newer approved version differs from it and the copy has no
+local changes; applying it installs the new recipe and keeps the copy's
+deployment fields and secrets. A copy edited locally shows as changed here and
+is offered connector updates only.
 
 **Export format.** An approved entry is exported as a JSON document, saved as
 `<id>.wash-di.json`:

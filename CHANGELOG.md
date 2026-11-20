@@ -23,7 +23,9 @@ changes the database (applied by `deploy/update.sh`) or the runtime images
 - API: the `/api/builder` draft routes, `/api/library/built` routes and
   `apply-connector-update`; the integration view reports `connectorUpdate` and
   each run's unmatched places.
-- Database: migration 0005 adds the built-library table (applied by
+- Database: migration 0004 adds builder drafts and their draft secrets,
+  migration 0005 the built-library table, and migration 0006 the library
+  version an installed built copy came from (all applied by
   `deploy/update.sh`). No image rebuild needed.
 
 ## 1.0.0 (2026-10-30)
