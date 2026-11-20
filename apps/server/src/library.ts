@@ -6,14 +6,26 @@
  * carries the deployment-owned fields over from the installed definition, so
  * a locally chosen AOI, schedule, limits, or setting values survive library
  * updates; the same fields are excluded from update detection.
+ *
+ * Built entries (app.built_library_entries) are builder-made sources an
+ * editor proposed and an admin approved. They are stored without code: an
+ * install inlines the connector's current code. An installed builder source
+ * has an update when its connector version is behind the registry, and
+ * applying it keeps the source's settings (recipe.config) as they are.
  */
 
-import { readdir, readFile } from "node:fs/promises"
+import { access, readdir, readFile } from "node:fs/promises"
 import path from "node:path"
 import pg from "pg"
-import { LocalizedString, IntegrationDefinition, SettingValue } from "@data-integrator/definitions"
+import { ConnectorId, LocalizedString, IntegrationDefinition, SettingValue } from "@data-integrator/definitions"
+import { AuthUser } from "./auth.js"
 import { canonicalDefinition, installIntegration, ID_PATTERN } from "./install.js"
 import { keepValidSettingValues } from "./integrationSettings.js"
+import { ConnectorInfo, CONNECTORS, connectorCode } from "./builder/connectors.js"
+import { validateRecipe } from "./builder/buildDefinition.js"
+
+/** The connector registry update detection reads; tests pass one with a bumped version. */
+export type ConnectorRegistry = Record<ConnectorId, ConnectorInfo>
 
 /** Fields the deployment owns once installed: carried over on update, ignored in update detection. */
 const DEPLOYMENT_FIELDS = ["aoi", "trigger", "limits", "settingValues"] as const
@@ -38,6 +50,25 @@ export interface LibraryEntry {
   status: "not_installed" | "installed" | "update_available"
   /** Installed version, when installed */
   installedVersion: number | null
+  /** Shipped with the library, or made with the source builder */
+  origin: "shipped" | "built"
+  /** Review state of a built entry (proposed ones are listed to admins only) */
+  builtStatus?: "proposed" | "approved" | "rejected"
+  /** Built entries: the installed copy differs from the approved entry */
+  changedHere?: boolean
+  /** Built entries, admins only: a new version waits for approval */
+  pendingVersion?: boolean
+}
+
+/** A refusal from the built-library routes, with the HTTP status to answer it with. */
+export class LibraryError extends Error {
+  readonly status: number
+
+  /** Creates a refusal answered with the given status. */
+  constructor(status: number, message: string) {
+    super(message)
+    this.status = status
+  }
 }
 
 /**
@@ -49,6 +80,75 @@ function comparableJson(definition: IntegrationDefinition): string {
   const stripped: Record<string, unknown> = { ...definition }
   for (const field of DEPLOYMENT_FIELDS) delete stripped[field]
   return JSON.stringify(canonicalDefinition(stripped))
+}
+
+/**
+ * A builder source compared with its built entry: the code is re-inlined from
+ * the connector and its version tracked on its own, so both are left out.
+ */
+function builtComparableJson(definition: IntegrationDefinition): string {
+  const { code: _code, ...rest } = definition
+  void _code
+  const recipe = rest.recipe ? { ...rest.recipe, connectorVersion: 0 } : rest.recipe
+  return comparableJson({ ...rest, recipe } as IntegrationDefinition)
+}
+
+/** The definition with the connector's current code and version inlined. */
+async function withCurrentConnector(
+  definition: IntegrationDefinition,
+  libraryPath: string,
+  connectors: ConnectorRegistry
+): Promise<IntegrationDefinition> {
+  const recipe = definition.recipe!
+  const info = connectors[recipe.connector]
+  if (!info) throw new Error(`Unknown connector "${recipe.connector}".`)
+  return {
+    ...definition,
+    recipe: { ...recipe, connectorVersion: info.version },
+    code: await connectorCode(recipe.connector, libraryPath)
+  }
+}
+
+/** One built entry row. */
+interface BuiltRow {
+  id: string
+  definition: IntegrationDefinition
+  status: "proposed" | "approved" | "rejected"
+  pending: boolean
+}
+
+/** Whether the shipped library has an entry directory of this id. */
+function shippedEntryExists(libraryPath: string, id: string): Promise<boolean> {
+  return access(path.join(libraryPath, "integrations", id)).then(() => true, () => false)
+}
+
+/**
+ * Loads an approved built entry ready to install: the connector's current
+ * code inlined, and the trigger a builder source needs (none but the webhook
+ * flag; the schedule is the deployment's). Null when there is none.
+ */
+export async function loadBuiltEntry(
+  pool: pg.Pool,
+  libraryPath: string,
+  id: string,
+  connectors: ConnectorRegistry = CONNECTORS
+): Promise<IntegrationDefinition | null> {
+  if (!ID_PATTERN.test(id)) return null
+  const row = await pool.query("SELECT definition FROM app.built_library_entries WHERE id = $1 AND status = 'approved'", [id])
+  if (row.rows.length === 0) return null
+  const definition = row.rows[0].definition as IntegrationDefinition
+  if (definition.id !== id || !definition.recipe) return null
+  const trigger = connectors[definition.recipe.connector]?.needsWebhook ? { webhook: true } : {}
+  return withCurrentConnector({ ...definition, trigger }, libraryPath, connectors)
+}
+
+/** A shipped entry, or else an approved built one, with its code inlined; null when neither exists. */
+export async function loadAnyLibraryEntry(
+  pool: pg.Pool,
+  libraryPath: string,
+  id: string
+): Promise<IntegrationDefinition | null> {
+  return (await loadLibraryEntry(libraryPath, id)) ?? (await loadBuiltEntry(pool, libraryPath, id))
 }
 
 /** Loads one entry's full definition (code file inlined), or null. */
@@ -71,59 +171,111 @@ export async function loadLibraryEntry(libraryPath: string, id: string): Promise
   return null
 }
 
-/** Lists the library with each entry's installed/update status. */
-export async function listLibrary(pool: pg.Pool, libraryPath: string): Promise<LibraryEntry[]> {
+/** What listLibrary needs to know beyond the library itself. */
+export interface ListLibraryOptions {
+  /** The viewer's role: admins also see proposed built entries */
+  role?: AuthUser["role"]
+  /** Connector registry for update detection (defaults to CONNECTORS) */
+  connectors?: ConnectorRegistry
+}
+
+/** Lists the library with each entry's installed/update status, built entries included. */
+export async function listLibrary(
+  pool: pg.Pool,
+  libraryPath: string,
+  options: ListLibraryOptions = {}
+): Promise<LibraryEntry[]> {
+  const connectors = options.connectors ?? CONNECTORS
   let ids: string[]
   try {
     ids = (await readdir(path.join(libraryPath, "integrations"))).filter(id => ID_PATTERN.test(id)).sort()
   } catch {
-    return []
+    ids = []
   }
   const installed = await pool.query("SELECT id, version, definition FROM app.integrations")
   const byId = new Map<string, { version: number; definition: IntegrationDefinition }>(
     installed.rows.map(row => [row.id, { version: row.version, definition: row.definition }])
   )
 
+  const summary = (id: string, definition: IntegrationDefinition) => ({
+    id,
+    name: definition.name ?? { _base: "en", en: id },
+    description: definition.description ?? null,
+    source: definition.source ?? null,
+    trigger: definition.trigger ?? {},
+    runtime: definition.runtime,
+    destinations: (definition.destinations ?? []).map(d =>
+      d.kind === "table" ? { kind: "table", id: d.tableId } : { kind: "raster", id: d.layerId }
+    )
+  })
+
   const entries: LibraryEntry[] = []
+  const shippedIds = new Set<string>()
   for (const id of ids) {
     const definition = await loadLibraryEntry(libraryPath, id)
     if (!definition || definition.id !== id) continue
+    shippedIds.add(id)
     const current = byId.get(id)
     entries.push({
-      id,
-      name: definition.name ?? { _base: "en", en: id },
-      description: definition.description ?? null,
-      source: definition.source ?? null,
-      trigger: definition.trigger ?? {},
-      runtime: definition.runtime,
-      destinations: (definition.destinations ?? []).map(d =>
-        d.kind === "table" ? { kind: "table", id: d.tableId } : { kind: "raster", id: d.layerId }
-      ),
+      ...summary(id, definition),
       status: !current
         ? "not_installed"
         : comparableJson(current.definition) === comparableJson(definition)
           ? "installed"
           : "update_available",
-      installedVersion: current?.version ?? null
+      installedVersion: current?.version ?? null,
+      origin: "shipped"
     })
   }
-  return entries
+
+  const isAdmin = options.role === "admin"
+  const built = await pool.query(
+    `SELECT id, definition, status, pending_definition IS NOT NULL AS pending FROM app.built_library_entries
+     WHERE status = 'approved' OR (status = 'proposed' AND $1) ORDER BY id`,
+    [isAdmin]
+  )
+  for (const row of built.rows as BuiltRow[]) {
+    // A shipped entry always wins its id
+    if (shippedIds.has(row.id) || row.definition.id !== row.id || !row.definition.recipe) continue
+    const current = byId.get(row.id)
+    const recipe = current?.definition.recipe
+    const info = connectors[row.definition.recipe.connector]
+    const behind = !!recipe && !!info && recipe.connectorVersion < info.version
+    entries.push({
+      ...summary(row.id, { ...row.definition, trigger: {} }),
+      status: !current ? "not_installed" : !recipe || behind ? "update_available" : "installed",
+      installedVersion: current?.version ?? null,
+      origin: "built",
+      builtStatus: row.status,
+      ...(current ? { changedHere: builtComparableJson(current.definition) !== builtComparableJson(row.definition) } : {}),
+      ...(isAdmin && row.pending ? { pendingVersion: true } : {})
+    })
+  }
+  return entries.sort((a, b) => a.id.localeCompare(b.id))
 }
 
 /**
- * Installs or updates one entry. On update, the deployment-owned fields keep
- * their installed values (present, absent, or explicit null alike). Returns
- * null when the entry does not exist.
+ * Installs or updates one entry, shipped or approved built. On update, the
+ * deployment-owned fields keep their installed values (present, absent, or
+ * explicit null alike). An installed builder source updates by its connector
+ * alone: the connector's current code and version, everything else as
+ * installed. Returns null when the entry does not exist.
  */
 export async function installLibraryEntry(
   pool: pg.Pool,
   libraryPath: string,
   id: string,
-  createdBy: string | null
+  createdBy: string | null,
+  connectors: ConnectorRegistry = CONNECTORS
 ): Promise<{ version: number } | null> {
-  const entry = await loadLibraryEntry(libraryPath, id)
+  const shipped = await loadLibraryEntry(libraryPath, id)
+  const entry = shipped ?? (await loadBuiltEntry(pool, libraryPath, id, connectors))
   if (!entry || entry.id !== id) return null
   const installed = await pool.query("SELECT definition FROM app.integrations WHERE id = $1", [id])
+  if (!shipped && installed.rows[0]?.definition.recipe) {
+    const current = installed.rows[0].definition as IntegrationDefinition
+    return installIntegration(pool, await withCurrentConnector(current, libraryPath, connectors), "ready", createdBy)
+  }
   const definition: Record<string, unknown> = { ...entry }
   if (installed.rows.length > 0) {
     const current = installed.rows[0].definition as Record<string, unknown>
@@ -140,4 +292,110 @@ export async function installLibraryEntry(
     else delete definition.settingValues
   }
   return installIntegration(pool, definition as unknown as IntegrationDefinition, "ready", createdBy)
+}
+
+/**
+ * Applies a connector update to an installed builder source: the connector's
+ * current code and version, with its settings and deployment fields as they
+ * are. Never runs on its own, only on this explicit request.
+ */
+export async function applyConnectorUpdate(
+  pool: pg.Pool,
+  libraryPath: string,
+  id: string,
+  createdBy: string | null,
+  connectors: ConnectorRegistry = CONNECTORS
+): Promise<{ version: number }> {
+  const row = await pool.query("SELECT definition FROM app.integrations WHERE id = $1", [id])
+  if (row.rows.length === 0) throw new LibraryError(404, "unknown integration")
+  const current = row.rows[0].definition as IntegrationDefinition
+  if (!current.recipe) throw new LibraryError(400, "Only sources made with the builder have connector updates.")
+  const info = connectors[current.recipe.connector]
+  if (!info) throw new LibraryError(400, `Unknown connector "${current.recipe.connector}".`)
+  if (current.recipe.connectorVersion >= info.version) throw new LibraryError(409, "The connector is already up to date.")
+  return installIntegration(pool, await withCurrentConnector(current, libraryPath, connectors), "ready", createdBy)
+}
+
+/**
+ * Proposes an installed builder source for the library, as its definition
+ * without the deployment-owned fields and without code (secrets travel as
+ * names only). A proposal for an approved entry waits as its pending version.
+ */
+export async function proposeBuiltEntry(
+  pool: pg.Pool,
+  libraryPath: string,
+  integrationId: string,
+  userId: string
+): Promise<{ id: string; status: "proposed" | "approved"; pending: boolean }> {
+  if (!ID_PATTERN.test(integrationId)) throw new LibraryError(404, "unknown integration")
+  const row = await pool.query("SELECT definition FROM app.integrations WHERE id = $1", [integrationId])
+  if (row.rows.length === 0) throw new LibraryError(404, "unknown integration")
+  const installed = row.rows[0].definition as IntegrationDefinition
+  if (!installed.recipe) throw new LibraryError(400, "Only sources made with the builder can be proposed for the library.")
+  try {
+    validateRecipe(installed.recipe)
+  } catch (err) {
+    throw new LibraryError(400, err instanceof Error ? err.message : String(err))
+  }
+  if (await shippedEntryExists(libraryPath, integrationId)) {
+    throw new LibraryError(409, `The library already has an entry "${integrationId}".`)
+  }
+  const proposed: Record<string, unknown> = { ...installed }
+  for (const field of [...DEPLOYMENT_FIELDS, "code"]) delete proposed[field]
+  const result = await pool.query(
+    `INSERT INTO app.built_library_entries AS e (id, definition, status, proposed_by, proposed_at)
+     VALUES ($1, $2, 'proposed', $3, now())
+     ON CONFLICT (id) DO UPDATE SET
+       definition = CASE WHEN e.status = 'approved' THEN e.definition ELSE EXCLUDED.definition END,
+       pending_definition = CASE WHEN e.status = 'approved' THEN EXCLUDED.definition ELSE NULL END,
+       approved_by = CASE WHEN e.status = 'approved' THEN e.approved_by ELSE NULL END,
+       decided_at = CASE WHEN e.status = 'approved' THEN e.decided_at ELSE NULL END,
+       note = CASE WHEN e.status = 'approved' THEN e.note ELSE NULL END,
+       status = CASE WHEN e.status = 'approved' THEN 'approved' ELSE 'proposed' END,
+       proposed_by = EXCLUDED.proposed_by,
+       proposed_at = EXCLUDED.proposed_at
+     RETURNING status, pending_definition IS NOT NULL AS pending`,
+    [integrationId, JSON.stringify(proposed), userId]
+  )
+  return { id: integrationId, status: result.rows[0].status, pending: result.rows[0].pending }
+}
+
+/** Where an approve or reject found nothing to decide: unknown (404) or already decided (409). */
+async function nothingToDecide(pool: pg.Pool, id: string): Promise<never> {
+  const row = await pool.query("SELECT 1 FROM app.built_library_entries WHERE id = $1", [id])
+  if (row.rows.length === 0) throw new LibraryError(404, "unknown library entry")
+  throw new LibraryError(409, "Nothing waits for a decision on this entry.")
+}
+
+/** Approves a proposed entry, or promotes an approved entry's pending version (bumping its version). */
+export async function approveBuiltEntry(pool: pg.Pool, id: string, adminId: string): Promise<{ version: number }> {
+  const result = await pool.query(
+    `UPDATE app.built_library_entries SET
+       definition = COALESCE(pending_definition, definition),
+       version = CASE WHEN pending_definition IS NOT NULL THEN version + 1 ELSE version END,
+       pending_definition = NULL,
+       status = 'approved',
+       approved_by = $2,
+       decided_at = now(),
+       note = NULL
+     WHERE id = $1 AND (status = 'proposed' OR (status = 'approved' AND pending_definition IS NOT NULL))
+     RETURNING version`,
+    [id, adminId]
+  )
+  if (result.rows.length === 0) return nothingToDecide(pool, id)
+  return { version: result.rows[0].version }
+}
+
+/** Rejects a proposed entry, or drops an approved entry's pending version; the note says why. */
+export async function rejectBuiltEntry(pool: pg.Pool, id: string, note: string | null): Promise<void> {
+  const result = await pool.query(
+    `UPDATE app.built_library_entries SET
+       status = CASE WHEN status = 'approved' THEN 'approved' ELSE 'rejected' END,
+       pending_definition = NULL,
+       note = $2,
+       decided_at = now()
+     WHERE id = $1 AND (status = 'proposed' OR (status = 'approved' AND pending_definition IS NOT NULL))`,
+    [id, note]
+  )
+  if (result.rowCount === 0) await nothingToDecide(pool, id)
 }

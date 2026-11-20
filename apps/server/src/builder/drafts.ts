@@ -54,12 +54,14 @@ export interface AcceptResult {
 }
 
 /**
- * Whether an integration id is already used: an installed integration or a
- * shipped library entry. Built library entries join here.
+ * Whether an integration id is already used: an installed integration, a
+ * shipped library entry, or a built library entry that was not rejected.
  */
 export async function idTaken(pool: pg.Pool, libraryPath: string, id: string): Promise<boolean> {
   const installed = await pool.query("SELECT 1 FROM app.integrations WHERE id = $1", [id])
   if (installed.rows.length > 0) return true
+  const built = await pool.query("SELECT 1 FROM app.built_library_entries WHERE id = $1 AND status <> 'rejected'", [id])
+  if (built.rows.length > 0) return true
   return access(path.join(libraryPath, "integrations", id)).then(() => true, () => false)
 }
 

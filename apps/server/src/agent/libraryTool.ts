@@ -8,7 +8,7 @@
 
 import pg from "pg"
 import { IntegrationDefinition, LocalizedString, localizeString } from "@data-integrator/definitions"
-import { listLibrary, loadLibraryEntry } from "../library.js"
+import { listLibrary, loadAnyLibraryEntry } from "../library.js"
 
 /** Words too short or too common to discriminate between entries. */
 const STOP_WORDS = new Set(["the", "and", "for", "with", "data", "from", "map", "layer", "table", "show", "get"])
@@ -76,7 +76,7 @@ export async function searchLibrary(
   const wanted = terms(query)
   const scored: { entry: (typeof entries)[number]; definition: IntegrationDefinition; score: number }[] = []
   for (const entry of entries) {
-    const definition = await loadLibraryEntry(libraryPath, entry.id)
+    const definition = await loadAnyLibraryEntry(pool, libraryPath, entry.id)
     if (!definition) continue
     const haystack = [
       entry.id,

@@ -15,7 +15,16 @@ import { getIntegration, getTableRows, listIntegrations, listIntegrationVersions
 import { getWebhookToken, receiveWebhook, rotateWebhookToken, WEBHOOK_TOKEN_PATTERN } from "./webhooks.js"
 import { deleteIntegration, installIntegration, integrationUsage, validateDefinition } from "./install.js"
 import { getHomeSummary } from "./home.js"
-import { installLibraryEntry, listLibrary, loadLibraryEntry } from "./library.js"
+import {
+  applyConnectorUpdate,
+  approveBuiltEntry,
+  installLibraryEntry,
+  LibraryError,
+  listLibrary,
+  loadAnyLibraryEntry,
+  proposeBuiltEntry,
+  rejectBuiltEntry
+} from "./library.js"
 import { parseCron } from "./cron.js"
 import { loadSkill, loadSkillsIndex, skillsDir } from "./skills.js"
 import { listSources, tableGeometry } from "./sources.js"
@@ -1097,7 +1106,74 @@ async function route(
 
   // The library: browsable entries, one-click install/update for editors
   if (pathname === "/api/library" && req.method === "GET") {
-    json(res, 200, { entries: libraryPath ? await listLibrary(pool, libraryPath) : [] })
+    json(res, 200, { entries: libraryPath ? await listLibrary(pool, libraryPath, { role: user.role }) : [] })
+    return
+  }
+
+  // Built entries: editors propose a builder source, admins approve or reject
+  if (pathname === "/api/library/built" && req.method === "POST") {
+    if (user.role === "viewer") {
+      json(res, 403, { error: "Viewers cannot propose library entries" })
+      return
+    }
+    if (!libraryPath) {
+      json(res, 503, { error: "No library on this server" })
+      return
+    }
+    const body = await readJsonBody(req)
+    if (typeof body.integrationId !== "string") {
+      json(res, 400, { error: "integrationId is required" })
+      return
+    }
+    try {
+      const result = await proposeBuiltEntry(pool, libraryPath, body.integrationId, user.id)
+      json(res, 200, result.pending ? result : { id: result.id, status: result.status })
+    } catch (err) {
+      if (!(err instanceof LibraryError)) throw err
+      json(res, err.status, { error: err.message })
+    }
+    return
+  }
+  const builtDecisionMatch = pathname.match(/^\/api\/library\/built\/([a-z][a-z0-9_]*)\/(approve|reject)$/)
+  if (builtDecisionMatch && req.method === "POST") {
+    if (user.role !== "admin") {
+      json(res, 403, { error: "Only admins can approve or reject library entries" })
+      return
+    }
+    const body = await readJsonBody(req)
+    const [, entryId, decision] = builtDecisionMatch
+    try {
+      if (decision === "approve") {
+        json(res, 200, { id: entryId, status: "approved", ...(await approveBuiltEntry(pool, entryId, user.id)) })
+      } else {
+        const note = typeof body.note === "string" && body.note.trim() !== "" ? body.note.trim() : null
+        await rejectBuiltEntry(pool, entryId, note)
+        json(res, 200, { id: entryId })
+      }
+    } catch (err) {
+      if (!(err instanceof LibraryError)) throw err
+      json(res, err.status, { error: err.message })
+    }
+    return
+  }
+
+  // A builder source's connector update: applied only on this explicit request
+  const connectorUpdateMatch = pathname.match(/^\/api\/integrations\/([a-z][a-z0-9_]*)\/apply-connector-update$/)
+  if (connectorUpdateMatch && req.method === "POST") {
+    if (user.role === "viewer") {
+      json(res, 403, { error: "Viewers cannot update integrations" })
+      return
+    }
+    if (!libraryPath) {
+      json(res, 503, { error: "No library on this server" })
+      return
+    }
+    try {
+      json(res, 200, await applyConnectorUpdate(pool, libraryPath, connectorUpdateMatch[1], user.id))
+    } catch (err) {
+      if (!(err instanceof LibraryError)) throw err
+      json(res, err.status, { error: err.message })
+    }
     return
   }
   // Skills: the library's source and technique know-how, readable by any
@@ -1120,7 +1196,7 @@ async function route(
   // One entry in full (code elided): what the Library page shows when a row expands
   const libraryEntryMatch = pathname.match(/^\/api\/library\/([a-z][a-z0-9_]*)$/)
   if (libraryEntryMatch && req.method === "GET") {
-    const definition = libraryPath ? await loadLibraryEntry(libraryPath, libraryEntryMatch[1]) : null
+    const definition = libraryPath ? await loadAnyLibraryEntry(pool, libraryPath, libraryEntryMatch[1]) : null
     if (!definition) {
       json(res, 404, { error: "unknown library entry" })
       return
