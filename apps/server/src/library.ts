@@ -17,7 +17,7 @@
 import { access, readdir, readFile } from "node:fs/promises"
 import path from "node:path"
 import pg from "pg"
-import { ConnectorId, LocalizedString, IntegrationDefinition, SettingValue } from "@data-integrator/definitions"
+import { ConnectorId, LocalizedString, IntegrationDefinition, Recipe, SettingValue } from "@data-integrator/definitions"
 import { AuthUser } from "./auth.js"
 import { canonicalDefinition, installIntegration, ID_PATTERN } from "./install.js"
 import { keepValidSettingValues } from "./integrationSettings.js"
@@ -398,4 +398,74 @@ export async function rejectBuiltEntry(pool: pg.Pool, id: string, note: string |
     [id, note]
   )
   if (result.rowCount === 0) await nothingToDecide(pool, id)
+}
+
+/** The file format of a shared built entry. */
+const ENTRY_FORMAT = "wash-di-library-entry"
+
+/** An approved built entry as a shareable file: no code, no AOI, no setting values. Null when there is none. */
+export async function exportBuiltEntry(
+  pool: pg.Pool,
+  id: string
+): Promise<{ format: string; version: number; definition: Record<string, unknown> } | null> {
+  if (!ID_PATTERN.test(id)) return null
+  const row = await pool.query("SELECT definition FROM app.built_library_entries WHERE id = $1 AND status = 'approved'", [id])
+  if (row.rows.length === 0) return null
+  const definition: Record<string, unknown> = { ...row.rows[0].definition }
+  for (const field of ["code", "aoi", "settingValues"]) delete definition[field]
+  return { format: ENTRY_FORMAT, version: 1, definition }
+}
+
+/**
+ * Stores a shared entry file for approval: as a new proposed entry, or as the
+ * pending version of an approved entry with the same id. Never changes an
+ * approved definition, and never installs anything.
+ */
+export async function importBuiltEntry(
+  pool: pg.Pool,
+  libraryPath: string,
+  file: Record<string, unknown>,
+  adminId: string
+): Promise<{ id: string; status: "proposed" | "approved"; pending: boolean }> {
+  if (file.format !== ENTRY_FORMAT || file.version !== 1) {
+    throw new LibraryError(400, `This is not a library entry file (expected format "${ENTRY_FORMAT}", version 1).`)
+  }
+  const raw = file.definition
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new LibraryError(400, "The file has no definition.")
+  if ("code" in raw) {
+    throw new LibraryError(400, "This file contains code. Library entries are built from connectors; code is not accepted.")
+  }
+  const definition = { ...(raw as Record<string, unknown>) }
+  const id = definition.id
+  if (typeof id !== "string" || !ID_PATTERN.test(id)) throw new LibraryError(400, "The entry id is missing or not valid.")
+  const recipe = definition.recipe as Recipe | undefined
+  if (!recipe || typeof recipe !== "object") throw new LibraryError(400, "The file has no recipe.")
+  try {
+    validateRecipe(recipe)
+  } catch (err) {
+    throw new LibraryError(400, err instanceof Error ? err.message : String(err))
+  }
+  if (await shippedEntryExists(libraryPath, id)) throw new LibraryError(400, `The library already has an entry "${id}".`)
+  const hand = await pool.query("SELECT definition->'recipe' IS NOT NULL AS built FROM app.integrations WHERE id = $1", [id])
+  if (hand.rows.length > 0 && !hand.rows[0].built) {
+    throw new LibraryError(400, `An integration "${id}" that was not made with the builder is already installed.`)
+  }
+  // Deployment-owned fields never travel
+  for (const field of ["aoi", "settingValues"]) delete definition[field]
+  const result = await pool.query(
+    `INSERT INTO app.built_library_entries AS e (id, definition, status, proposed_by, proposed_at)
+     VALUES ($1, $2, 'proposed', $3, now())
+     ON CONFLICT (id) DO UPDATE SET
+       definition = CASE WHEN e.status = 'approved' THEN e.definition ELSE EXCLUDED.definition END,
+       pending_definition = CASE WHEN e.status = 'approved' THEN EXCLUDED.definition ELSE NULL END,
+       approved_by = CASE WHEN e.status = 'approved' THEN e.approved_by ELSE NULL END,
+       decided_at = CASE WHEN e.status = 'approved' THEN e.decided_at ELSE NULL END,
+       note = CASE WHEN e.status = 'approved' THEN e.note ELSE NULL END,
+       status = CASE WHEN e.status = 'approved' THEN 'approved' ELSE 'proposed' END,
+       proposed_by = EXCLUDED.proposed_by,
+       proposed_at = EXCLUDED.proposed_at
+     RETURNING status, pending_definition IS NOT NULL AS pending`,
+    [id, JSON.stringify(definition), adminId]
+  )
+  return { id, status: result.rows[0].status, pending: result.rows[0].pending }
 }

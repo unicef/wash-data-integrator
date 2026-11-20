@@ -17,7 +17,7 @@ import { deleteIntegration, installIntegration, integrationUsage, validateDefini
 import { getHomeSummary } from "./home.js"
 import {
   applyConnectorUpdate,
-  approveBuiltEntry,
+  approveBuiltEntry, exportBuiltEntry, importBuiltEntry,
   installLibraryEntry,
   LibraryError,
   listLibrary,
@@ -1150,6 +1150,46 @@ async function route(
         await rejectBuiltEntry(pool, entryId, note)
         json(res, 200, { id: entryId })
       }
+    } catch (err) {
+      if (!(err instanceof LibraryError)) throw err
+      json(res, err.status, { error: err.message })
+    }
+    return
+  }
+
+  // Sharing built entries: any editor may export an approved one; only an
+  // admin may import, and an import still waits for approval
+  const builtExportMatch = pathname.match(/^\/api\/library\/built\/([a-z][a-z0-9_]*)\/export$/)
+  if (builtExportMatch && req.method === "GET") {
+    if (user.role === "viewer") {
+      json(res, 403, { error: "Viewers cannot export library entries" })
+      return
+    }
+    const file = await exportBuiltEntry(pool, builtExportMatch[1])
+    if (!file) {
+      json(res, 404, { error: "unknown library entry" })
+      return
+    }
+    res.writeHead(200, {
+      "content-type": "application/json",
+      "content-disposition": `attachment; filename="${builtExportMatch[1]}.wash-di.json"`
+    })
+    res.end(JSON.stringify(file, null, 2))
+    return
+  }
+  if (pathname === "/api/library/built/import" && req.method === "POST") {
+    if (user.role !== "admin") {
+      json(res, 403, { error: "Only admins can import library entries" })
+      return
+    }
+    if (!libraryPath) {
+      json(res, 503, { error: "No library on this server" })
+      return
+    }
+    const body = await readJsonBody(req)
+    try {
+      const result = await importBuiltEntry(pool, libraryPath, body, user.id)
+      json(res, 200, result.pending ? result : { id: result.id, status: result.status })
     } catch (err) {
       if (!(err instanceof LibraryError)) throw err
       json(res, err.status, { error: err.message })

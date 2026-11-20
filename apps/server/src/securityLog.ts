@@ -34,7 +34,7 @@ export function actorFields(user: AuthUser | null): Record<string, unknown> {
 export function originFields(req: IncomingMessage): Record<string, unknown> {
   const forwarded = req.headers["x-forwarded-for"]
   return {
-    ip: req.socket.remoteAddress ?? null,
+    ip: req.socket?.remoteAddress ?? null,
     ...(forwarded ? { forwardedFor: Array.isArray(forwarded) ? forwarded.join(", ") : forwarded } : {})
   }
 }
