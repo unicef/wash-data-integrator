@@ -198,6 +198,14 @@ function validateRules(definition: IntegrationDefinition): void {
   }
 }
 
+/** An insert-only install found the integration id already in use. */
+export class IntegrationExistsError extends Error {
+  /** Creates the error for one id. */
+  constructor(id: string) {
+    super(`The id "${id}" is already used by another source.`)
+  }
+}
+
 /** Lifecycle of an installed integration; design sessions only install certified definitions. */
 export type IntegrationStatus = "draft" | "ready"
 
@@ -212,13 +220,16 @@ export type IntegrationStatus = "draft" | "ready"
  * scratch area and call this only at finish, with a cold-run-certified
  * definition. createdBy is the installing user, or null for CLI installs;
  * enabledOnCreate sets a new row's scheduler switch (imports land paused).
+ * insertOnly refuses (IntegrationExistsError, checked under the row lock in
+ * the install transaction) an id that already has a row, instead of updating it.
  */
 export async function installIntegration(
   pool: pg.Pool,
   definition: IntegrationDefinition,
   status: IntegrationStatus = "ready",
   createdBy: string | null = null,
-  enabledOnCreate = true
+  enabledOnCreate = true,
+  insertOnly = false
 ): Promise<{ version: number }> {
   validateDefinition(definition)
   const definitionJson = JSON.stringify(definition)
@@ -236,6 +247,9 @@ export async function installIntegration(
        WHERE i.id = $1 FOR UPDATE OF i`,
       [definition.id, definitionJson]
     )
+    if (insertOnly && current.rows.length > 0) {
+      throw new IntegrationExistsError(definition.id)
+    }
     if (current.rows.length === 0) {
       version = 1
       await client.query(

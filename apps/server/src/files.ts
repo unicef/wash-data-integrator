@@ -302,15 +302,22 @@ export async function setCurrentVersions(
  * Hands a design session's unowned uploads to the integration whose draft row
  * now exists, renumbering each after the slot's existing versions (normally
  * none: the row was just created). Bytes stay where they are, keyed by id.
+ * With versionIds only those uploads are adopted (a builder keeps one per slot).
  */
-export async function adoptSessionFiles(pool: pg.Pool, sessionId: string, integrationId: string): Promise<number> {
+export async function adoptSessionFiles(
+  pool: pg.Pool,
+  sessionId: string,
+  integrationId: string,
+  versionIds?: string[]
+): Promise<number> {
   const client = await pool.connect()
   try {
     await client.query("BEGIN")
     const pending = await client.query(
       `SELECT id, slot_id FROM app.file_versions
-       WHERE session_id = $1 AND integration_id IS NULL ORDER BY slot_id, version`,
-      [sessionId]
+       WHERE session_id = $1 AND integration_id IS NULL AND ($2::uuid[] IS NULL OR id = ANY($2::uuid[]))
+       ORDER BY slot_id, version`,
+      [sessionId, versionIds ?? null]
     )
     for (const row of pending.rows) {
       await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [

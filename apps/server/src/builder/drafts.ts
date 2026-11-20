@@ -16,7 +16,7 @@ import { AuthUser } from "../auth.js"
 import { executeRun, ExecutorDeps } from "../executor.js"
 import { FileApiOptions, handleSessionUpload } from "../filesApi.js"
 import { json, readJsonBody } from "../http.js"
-import { deleteIntegration, ID_PATTERN, installIntegration } from "../install.js"
+import { deleteIntegration, ID_PATTERN, IntegrationExistsError, installIntegration } from "../install.js"
 import { adoptSessionFiles } from "../files.js"
 import { getWebhookToken } from "../webhooks.js"
 import { queryRows } from "../queryApi.js"
@@ -91,6 +91,8 @@ export interface BuilderOptions {
   executor: ExecutorDeps | null
   /** Host name resolver for link checks; tests inject one */
   resolve?: Resolver
+  /** Test hook: runs between the id check and the install of an accept */
+  beforeInstall?: (id: string) => Promise<void>
 }
 
 /** A refusal with the HTTP status to answer it with. */
@@ -246,17 +248,26 @@ export class BuilderService {
    * their URL), and finishes the draft. A failure after the install removes
    * the integration again and leaves the draft as it was.
    */
-  async accept(draft: Draft, userId: string): Promise<AcceptResult> {
-    const { id, recipe } = draft.state
-    if (!id) throw new BuilderError(400, "Give the source an id before accepting it.")
-    if (!recipe) throw new BuilderError(400, "Choose a connector before accepting the source.")
+  async accept(draft: Draft, user: AuthUser): Promise<AcceptResult> {
     const lock = await this.pool.connect()
+    const draftLock = `builder-accept-draft:${draft.id}`
+    const held: string[] = []
     try {
-      // One accept per draft at a time, and one per id across drafts
-      await lock.query("SELECT pg_advisory_lock(hashtext($1))", [`builder-accept:${id}`])
-      return await this.acceptLocked(draft, id, recipe, userId)
+      // One accept per draft at a time; the draft is re-read under the lock
+      await lock.query("SELECT pg_advisory_lock(hashtext($1))", [draftLock])
+      held.push(draftLock)
+      const fresh = await this.find(draft.id, user)
+      if (!fresh) throw new BuilderError(404, "unknown draft")
+      const { id, recipe } = fresh.state
+      if (!id) throw new BuilderError(400, "Give the source an id before accepting it.")
+      if (!recipe) throw new BuilderError(400, "Choose a connector before accepting the source.")
+      // And one per id across drafts
+      const idLock = `builder-accept:${id}`
+      await lock.query("SELECT pg_advisory_lock(hashtext($1))", [idLock])
+      held.push(idLock)
+      return await this.acceptLocked(fresh, id, recipe, user.id)
     } finally {
-      await lock.query("SELECT pg_advisory_unlock(hashtext($1))", [`builder-accept:${id}`]).catch(() => {})
+      for (const name of held.reverse()) await lock.query("SELECT pg_advisory_unlock(hashtext($1))", [name]).catch(() => {})
       lock.release()
     }
   }
@@ -318,20 +329,30 @@ export class BuilderService {
     }
     const key = Object.keys(secrets).length > 0 ? this.secretKey() : null
 
+    await this.options.beforeInstall?.(id)
+    // Insert-only and disabled: nothing else's integration is touched, and the
+    // scheduler cannot queue a run until the key and file are in place
     try {
-      await installIntegration(this.pool, definition, "ready", draft.userId ?? userId)
+      await installIntegration(this.pool, definition, "ready", draft.userId ?? userId, false, true)
     } catch (err) {
+      if (err instanceof IntegrationExistsError) throw new BuilderError(409, err.message)
       const message = err instanceof Error ? err.message : String(err)
       throw new BuilderError(/is owned by/.test(message) ? 409 : 400, message)
     }
     try {
       for (const [secretName, value] of Object.entries(secrets)) await setSecret(this.pool, key!, id, secretName, value)
-      // The upload becomes version 1 of its slot (unadopted uploads of this draft only)
-      if (slotIds.length > 0) await adoptSessionFiles(this.pool, draft.id, id)
+      // The upload becomes version 1 of its slot: only the pinned (latest) one is adopted
+      if (slotIds.length > 0) await adoptSessionFiles(this.pool, draft.id, id, Object.values(pins))
+      await this.pool.query("UPDATE app.integrations SET enabled = true WHERE id = $1", [id])
     } catch (err) {
-      // Never leave a half-installed source: the draft stays intact for a retry
-      await this.pool.query("DELETE FROM app.integration_secrets WHERE integration_id = $1", [id]).catch(() => {})
-      await deleteIntegration(this.pool, id).catch(() => {})
+      // Never leave a half-installed source: remove our own install; the draft stays intact for a retry
+      try {
+        await this.pool.query("DELETE FROM app.integration_secrets WHERE integration_id = $1", [id])
+        await deleteIntegration(this.pool, id)
+      } catch (cleanup) {
+        console.error(`builder accept ${id}: rollback failed: ${cleanup instanceof Error ? cleanup.message : cleanup}`)
+        throw new BuilderError(500, `Accepting failed and the source "${id}" may need cleaning up by an admin.`)
+      }
       throw err
     }
 
@@ -684,7 +705,7 @@ export async function routeBuilder(
     } else if (sub === "/preview" && req.method === "POST") {
       json(res, 200, await builder.preview(draft))
     } else if (sub === "/accept" && req.method === "POST") {
-      json(res, 200, await builder.accept(draft, user.id))
+      json(res, 200, await builder.accept(draft, user))
     } else if (sub === "/places/suggest" && req.method === "POST") {
       const body = await readJsonBody(req)
       json(res, 200, await builder.suggest(draft, body.names))

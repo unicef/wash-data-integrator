@@ -15,8 +15,9 @@ import { createApiServer } from "../src/server.js"
 import { TileRenderer } from "../src/tiles.js"
 import { RasterStore } from "../src/rasterStore.js"
 import { FileStore } from "../src/fileStore.js"
+import { installIntegration } from "../src/install.js"
 import { getSecrets } from "../src/secrets.js"
-import { BuilderService } from "../src/builder/drafts.js"
+import { BuilderOptions, BuilderService } from "../src/builder/drafts.js"
 import { startTestDb, TestDb } from "./helpers/pg.js"
 
 const MIGRATIONS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "migrations")
@@ -30,6 +31,7 @@ async function resolve(host: string): Promise<string[]> {
   if (!found) throw new Error(`no such host ${host}`)
   return found
 }
+let builderOptions: BuilderOptions
 let db: TestDb
 let pool: pg.Pool
 let server: Server
@@ -58,7 +60,7 @@ before(async () => {
   store = new RasterStore(storeRoot)
   workRoot = await mkdtemp(path.join(tmpdir(), "builder-work-"))
   const files = new FileStore(await mkdtemp(path.join(tmpdir(), "builder-files-")))
-  const builder = new BuilderService(pool, {
+  builderOptions = {
     libraryPath: LIBRARY,
     resolve,
     executor: {
@@ -71,7 +73,8 @@ before(async () => {
       images: { python: PY_IMAGE },
       databaseUrl: db.url
     }
-  })
+  }
+  const builder = new BuilderService(pool, builderOptions)
   server = createApiServer(
     pool, new TileRenderer(store, "/nonexistent"), null, null, store, null, null, null, LIBRARY, null, null, null,
     { store: files, maxUploadMb: 10 }, builder
@@ -237,3 +240,75 @@ async function saveDraft(draftId: string, state: unknown, bearer = editor): Prom
   assert.equal(response.status, 200, await response.text())
 }
 
+
+async function stage(draftId: string, body: string): Promise<void> {
+  const upload = await call(`/api/builder/drafts/${draftId}/files/data?filename=cases.csv`, editor, {
+    method: "PUT",
+    body,
+    headers: { "content-type": "text/csv" }
+  })
+  assert.equal(upload.status, 201, await upload.text())
+}
+
+test("accept_refuses_id_installed_meanwhile", async () => {
+  const id = await newDraft()
+  await saveDraft(id, draftState("meanwhile_one", "sheet_link", { url: "https://data.example.org/a.csv" }))
+  builderOptions.beforeInstall = async taken => {
+    await installIntegration(pool, {
+      id: taken, name: { _base: "en", en: "Other" }, trigger: {}, runtime: "python",
+      destinations: [{ kind: "table", tableId: taken, action: "replace", columns: [{ id: "x", type: "text" }] }],
+      code: "def run(ctx): ...", contract: 2
+    })
+  }
+  try {
+    const refused = await accept(id)
+    assert.equal(refused.status, 409)
+  } finally {
+    delete builderOptions.beforeInstall
+  }
+  // The other install is untouched (version 1, still enabled, not deleted)
+  const row = await pool.query("SELECT version, enabled FROM app.integrations WHERE id = 'meanwhile_one'")
+  assert.deepEqual(row.rows, [{ version: 1, enabled: true }])
+  assert.equal((await pool.query("SELECT status FROM app.agent_sessions WHERE id = $1", [id])).rows[0].status, "active")
+})
+
+test("rollback_on_file_failure_removes_only_its_own_install", async () => {
+  const id = await newDraft()
+  await stage(id, "region,cases\nBari,3\n")
+  await saveDraft(id, draftState("rollback_files", "upload", {}))
+  await pool.query(`CREATE OR REPLACE FUNCTION app.test_block_adopt() RETURNS trigger AS $$
+    BEGIN IF NEW.integration_id = 'rollback_files' THEN RAISE EXCEPTION 'blocked for test'; END IF; RETURN NEW; END $$ LANGUAGE plpgsql`)
+  await pool.query("CREATE TRIGGER test_block_adopt BEFORE UPDATE ON app.file_versions FOR EACH ROW EXECUTE FUNCTION app.test_block_adopt()")
+  try {
+    const failed = await accept(id)
+    assert.ok(failed.status >= 400)
+  } finally {
+    await pool.query("DROP TRIGGER test_block_adopt ON app.file_versions")
+  }
+  assert.equal((await pool.query("SELECT 1 FROM app.integrations WHERE id = 'rollback_files'")).rows.length, 0)
+  assert.equal((await pool.query("SELECT 1 FROM app.integration_secrets WHERE integration_id = 'rollback_files'")).rows.length, 0)
+  assert.equal((await pool.query("SELECT status FROM app.agent_sessions WHERE id = $1", [id])).rows[0].status, "active")
+  const staged = await pool.query("SELECT integration_id FROM app.file_versions WHERE session_id = $1", [id])
+  assert.deepEqual(staged.rows, [{ integration_id: null }])
+  // A retry once the fault is gone succeeds
+  assert.equal((await accept(id)).status, 200)
+})
+
+test("upload_three_times_installs_one_version", async () => {
+  const id = await newDraft()
+  await stage(id, "region,cases\nBari,1\n")
+  await stage(id, "region,cases\nBari,2\n")
+  await stage(id, "region,cases\nBari,3\n")
+  await saveDraft(id, draftState("upload_thrice", "upload", {}))
+  assert.equal((await accept(id)).status, 200)
+  const versions = await pool.query("SELECT version FROM app.file_versions WHERE integration_id = 'upload_thrice'")
+  assert.deepEqual(versions.rows, [{ version: 1 }])
+})
+
+test("concurrent_accepts_of_one_draft_install_once", async () => {
+  const id = await newDraft()
+  await saveDraft(id, draftState("race_one", "sheet_link", { url: "https://data.example.org/a.csv" }))
+  const [a, b] = await Promise.all([accept(id), accept(id)])
+  assert.deepEqual([a.status, b.status].sort(), [200, 409])
+  assert.equal((await pool.query("SELECT 1 FROM app.runs WHERE integration_id = 'race_one'")).rows.length, 1)
+})
