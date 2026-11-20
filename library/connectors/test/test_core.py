@@ -110,6 +110,19 @@ class CoreTests(unittest.TestCase):
             self.assertEqual(res["state"]["rows"], 1)
             self.assertTrue(os.path.exists(os.path.join(out_dir, "cases.csv")))
 
+    def test_read_places_reads_gpkg(self):
+        try:
+            import geopandas
+        except ImportError:
+            self.skipTest("geopandas is not installed")
+        with tempfile.TemporaryDirectory() as d:
+            geopandas.GeoDataFrame({"name": ["Banaadir"], "code": ["SO22"]}, geometry=geopandas.points_from_xy([45.3], [2.0]),
+                                   crs="EPSG:4326").to_file(os.path.join(d, "places.gpkg"), layer="places", driver="GPKG")
+            with open(os.path.join(d, "manifest.json"), "w") as f:
+                json.dump({"inputs": {"places": {"kind": "table", "tableId": "p", "path": "places.gpkg",
+                                                  "format": "gpkg", "rowCount": 1}}}, f)
+            self.assertEqual(read_places(Ctx(d, d), PLACES), [{"name": "Banaadir", "code": "SO22"}])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -164,6 +164,9 @@ def read_places(ctx, places):
     elif fmt == "json":
         with open(path, encoding="utf-8") as f:
             frame = pd.DataFrame(json.load(f)).astype(str)
+    elif fmt == "gpkg":
+        import geopandas  # in the runtime image; the extract's layer is named after the input id
+        frame = pd.DataFrame(geopandas.read_file(path, layer="places")).astype(str)
     else:
         raise ValueError(f"Unsupported places format: {fmt}")
     name_col, code_col = places["nameColumn"], places["codeColumn"]
