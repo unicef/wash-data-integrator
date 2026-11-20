@@ -1,0 +1,115 @@
+import json
+import os
+import sys
+import tempfile
+import unittest
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(HERE))
+
+import pandas as pd
+
+from _core import (apply_cleanup, apply_columns, finish, match_places,
+                   normalise, read_places)
+
+
+class Ctx:
+    def __init__(self, in_dir="", out_dir=""):
+        self.in_dir = in_dir
+        self.out_dir = out_dir
+
+
+PLACES = {"column": "region", "table": "places", "nameColumn": "name",
+          "codeColumn": "code", "matches": {}}
+ROWS = [{"name": "Banaadir", "code": "SO22"}, {"name": "Bari Region", "code": "SO12"}]
+
+
+class CoreTests(unittest.TestCase):
+    def test_normalise_cases(self):
+        with open(os.path.join(os.path.dirname(HERE), "normalise_cases.json")) as f:
+            cases = json.load(f)
+        self.assertGreaterEqual(len(cases), 5)
+        for c in cases:
+            self.assertEqual(normalise(c["input"]), c["expected"], c["input"])
+
+    def test_header_row_skips_title_rows(self):
+        raw = pd.DataFrame([["Report", None], ["", None], ["region", "value"], ["A", 1], ["B", 2]])
+        out = apply_cleanup(raw, {"headerRow": 3})
+        self.assertEqual(list(out.columns), ["region", "value"])
+        self.assertEqual(len(out), 2)
+        self.assertEqual(out.iloc[0]["region"], "A")
+
+    def test_skip_rows(self):
+        raw = pd.DataFrame([["x", "y"], ["junk", "junk"], ["a", "b"]])
+        out = apply_cleanup(raw, {"skipRows": 1, "headerRow": 2})
+        self.assertEqual(list(out.columns), ["a", "b"])
+        self.assertEqual(len(out), 0)
+
+    def test_filters_equals_and_contains(self):
+        df = pd.DataFrame({"kind": ["Well", "well pump", "Tap"], "n": [1, 2, 3]})
+        eq = apply_cleanup(df, {"filters": [{"column": "kind", "op": "equals", "value": "well"}]})
+        self.assertEqual(list(eq["n"]), [1])
+        co = apply_cleanup(df, {"filters": [{"column": "kind", "op": "contains", "value": "well"}]})
+        self.assertEqual(list(co["n"]), [1, 2])
+
+    def test_unpivot_dates_across_columns(self):
+        df = pd.DataFrame({"region": ["A", "B"], "2024-01": [1, 2], "2024-02": [3, 4]})
+        out = apply_cleanup(df, {"unpivot": {"columns": ["2024-01", "2024-02"],
+                                              "dateColumnId": "month", "valueColumnId": "cases"}})
+        self.assertEqual(list(out.columns), ["region", "month", "cases"])
+        self.assertEqual(len(out), 4)
+        self.assertEqual(list(out["month"][:2]), ["2024-01", "2024-01"])
+
+    def test_type_failures_reported_not_dropped(self):
+        df = pd.DataFrame({"R": ["A", "B", "C"], "V": ["1", "oops", ""]})
+        out, errors = apply_columns(df, [{"from": "R", "id": "region", "type": "text"},
+                                         {"from": "V", "id": "value", "type": "number"}])
+        self.assertEqual(len(out), 3)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("oops", errors[0])
+        self.assertTrue(pd.isna(out["value"][1]))
+        self.assertEqual(out["value"][0], 1)
+
+    def test_date_column(self):
+        df = pd.DataFrame({"D": ["2024-03-05", "nope"]})
+        out, errors = apply_columns(df, [{"from": "D", "id": "d", "type": "date"}])
+        self.assertEqual(out["d"][0], "2024-03-05")
+        self.assertEqual(len(errors), 1)
+
+    def test_saved_match_wins_over_exact(self):
+        places = dict(PLACES, matches={"Banaadir": "CUSTOM"})
+        df = pd.DataFrame({"region": ["Banaadir", "Bari"]})
+        out, unmatched = match_places(df, places, ROWS)
+        self.assertEqual(list(out["region_code"]), ["CUSTOM", "SO12"])
+        self.assertEqual(unmatched, [])
+        self.assertEqual(list(out["region"]), ["Banaadir", "Bari"])
+
+    def test_new_name_later_run_kept_unmatched(self):
+        df = pd.DataFrame({"region": ["Banaadir", "Newtown", "Newtown"]})
+        out, unmatched = match_places(df, PLACES, ROWS)
+        self.assertEqual(len(out), 3)
+        self.assertEqual(list(out["region_code"]), ["SO22", "", ""])
+        self.assertEqual(unmatched, ["Newtown"])
+
+    def test_read_places_and_finish(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, "in"))
+            with open(os.path.join(d, "in", "manifest.json"), "w") as f:
+                json.dump({"inputs": {"places": {"kind": "table", "tableId": "p", "path": "p.csv",
+                                                  "format": "csv", "rowCount": 2}}}, f)
+            pd.DataFrame({"name": ["Banaadir", "Bari"], "code": ["SO22", "SO12"]}).to_csv(
+                os.path.join(d, "in", "p.csv"), index=False)
+            out_dir = os.path.join(d, "out")
+            ctx = Ctx(os.path.join(d, "in"), out_dir)
+            rows = read_places(ctx, PLACES)
+            self.assertEqual(rows[0], {"name": "Banaadir", "code": "SO22"})
+            df = pd.DataFrame({"region": ["Banaadir"], "region_code": ["SO22"]})
+            res = finish(ctx, df, "cases", ["X"], ["bad"])
+            self.assertEqual(res["tables"], [{"tableId": "cases", "path": "cases.csv", "format": "csv"}])
+            self.assertEqual(res["state"]["unmatchedPlaces"], ["X"])
+            self.assertEqual(res["state"]["rows"], 1)
+            self.assertTrue(os.path.exists(os.path.join(out_dir, "cases.csv")))
+
+
+if __name__ == "__main__":
+    unittest.main()

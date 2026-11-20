@@ -1,0 +1,13 @@
+[
+  {"input": "Woqooyi Galbeed Region", "expected": "woqooyi galbeed"},
+  {"input": "Banaadir", "expected": "banaadir"},
+  {"input": "Gobolka Bari", "expected": "bari"},
+  {"input": "  MIDDLE-SHABELLE ", "expected": "middle shabelle"},
+  {"input": "Kéntucky County", "expected": "kentucky"},
+  {"input": "", "expected": ""},
+  {"input": "District", "expected": ""},
+  {"input": "Degmada Hodan", "expected": "hodan"},
+  {"input": "Zone 12 B", "expected": "zone 12 b"},
+  {"input": "Districts North", "expected": "districts north"},
+  {"input": "Rhode Island State", "expected": "rhode island"}
+]
