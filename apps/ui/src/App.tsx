@@ -18,6 +18,7 @@ import { TablePage } from "./TablePage.js"
 import { Library } from "./Library.js"
 import { HowItWorks } from "./HowItWorks.js"
 import { DesignStart } from "./DesignStart.js"
+import { BuilderPage } from "./builder/BuilderPage.js"
 import { UserMenu } from "./UserMenu.js"
 import { allowHashChange } from "./navGuard.js"
 
@@ -62,6 +63,10 @@ interface Route {
   layerId: string | null
   /** Design session whose scratch layer the page shows (?session=) */
   layerSessionId: string | null
+  /** True on the source builder (#/builder and #/builder/<draftId>) */
+  builder: boolean
+  /** Builder draft to resume; null starts a new one */
+  builderDraftId: string | null
 }
 
 /** Current location parsed from the hash. */
@@ -72,6 +77,7 @@ function parseHash(): Route {
   const table = hash.match(/^#\/table\/([a-z][a-z0-9_]*)$/)
   const dashboard = hash.match(/^#\/dashboard\/([a-z][a-z0-9_-]*)$/)
   const layer = hash.match(/^#\/layer\/([a-z][a-z0-9_]*)$/)
+  const builder = hash.match(/^#\/builder(?:\/([0-9a-f-]{36}))?$/)
   return {
     sessionId: session ? session[1] : null,
     integrationId: integration ? integration[1] : null,
@@ -90,7 +96,9 @@ function parseHash(): Route {
     library: hash === "#/library",
     howItWorks: hash === "#/how-it-works",
     layerId: layer ? layer[1] : null,
-    layerSessionId: layer ? new URLSearchParams(query ?? "").get("session") : null
+    layerSessionId: layer ? new URLSearchParams(query ?? "").get("session") : null,
+    builder: builder !== null,
+    builderDraftId: builder?.[1] ?? null
   }
 }
 
@@ -251,7 +259,7 @@ export function App() {
 
   const activeSection = route.tableId || route.layerId || route.data ? "data"
     : route.dashboardId || route.dashboards ? "dashboards"
-    : route.integrationId || route.integrations || route.designPrompt !== null ? "integrations"
+    : route.integrationId || route.integrations || route.designPrompt !== null || route.builder ? "integrations"
     : route.library ? "library" : route.ask ? "ask"
     : route.sessionId || route.sessions || route.settings || route.settingsUsers || route.aiPrivacy || route.howItWorks ? null : "home"
   const canDesign = user.role !== "viewer"
@@ -296,6 +304,8 @@ export function App() {
         <HowItWorks />
       ) : route.library ? (
         <Library user={user} installId={route.libraryInstall} />
+      ) : route.builder ? (
+        <BuilderPage draftId={route.builderDraftId} canDesign={canDesign} isAdmin={user.role === "admin"} />
       ) : route.designPrompt !== null ? (
         <DesignStart prompt={route.designPrompt} canDesign={canDesign} />
       ) : route.settingsUsers ? (

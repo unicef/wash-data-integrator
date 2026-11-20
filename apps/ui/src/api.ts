@@ -1,7 +1,7 @@
 /** LocalizedString from ez-localize: _base names the authored locale. */
 import type { LocalizedString } from "ez-localize"
 import { currentLocale } from "./localization.js"
-import type { SettingSpec, SettingValue } from "@data-integrator/definitions"
+import type { Recipe, SettingSpec, SettingValue, SourceInfo, Trigger } from "@data-integrator/definitions"
 
 export type { SettingSpec, SettingValue }
 
@@ -1684,4 +1684,144 @@ export function deleteSecretValue(integrationId: string, name: string): Promise<
 /** Runs the agent's check snippet for one requested credential of a design session. */
 export function checkSessionSecret(sessionId: string, name: string): Promise<{ ok: boolean; output: string }> {
   return request(`/api/sessions/${sessionId}/secrets/${name}/check`, { method: "POST" })
+}
+
+/** The source builder's screens as saved on a draft; a PUT replaces all of it. */
+export interface BuilderState {
+  /** Screen the user was on */
+  step?: string
+  /** Integration id the accepted source takes; also its table's name */
+  id?: string
+  /** Display name of the source */
+  name?: LocalizedString | string
+  /** Provenance: provider, licence, limitations */
+  source?: SourceInfo
+  /** Schedule */
+  trigger?: Trigger
+  /** Connector and its settings */
+  recipe?: Recipe
+}
+
+/** One builder draft from GET /api/builder/drafts/:id. */
+export interface BuilderDraft {
+  /** Draft id */
+  id: string
+  /** Who started it */
+  userId: string | null
+  /** Saved screens */
+  state: BuilderState
+  /** Created (ISO) */
+  createdAt: string
+  /** Last saved (ISO) */
+  updatedAt: string
+}
+
+/** What reading a source found: its columns with a few sample values, and its row count. */
+export interface BuilderInspect {
+  /** Columns in source order */
+  columns: { name: string; sample: unknown[] }[]
+  /** Rows read (at most the preview limit) */
+  rows: number
+}
+
+/** Place suggestions for one name from the source. */
+export interface PlaceSuggestion {
+  /** The name as the source writes it */
+  name: string
+  /** Code of the place whose name is the same */
+  exact?: string
+  /** Similar places, best first */
+  close: { code: string; name: string; score: number }[]
+}
+
+/** What a preview run stored. */
+export interface BuilderPreview {
+  /** First rows as stored (at most 50) */
+  rows: Record<string, unknown>[]
+  /** Rows stored in all */
+  rowCount: number
+  /** Distinct place names that found a code */
+  matched: number
+  /** Place names that found no code */
+  unmatched: string[]
+  /** Values that did not fit their column's type */
+  typeErrors: string[]
+}
+
+/** What accepting a draft did. */
+export interface BuilderAccept {
+  /** The installed source */
+  integrationId: string
+  /** The queued first run */
+  runId?: string
+  /** Path senders post to (pushed-data sources only) */
+  webhookUrl?: string
+}
+
+/** Starts an empty builder draft. */
+export function createBuilderDraft(): Promise<{ id: string }> {
+  return request("/api/builder/drafts", { method: "POST" })
+}
+
+/** Reads a builder draft. */
+export function getBuilderDraft(id: string): Promise<BuilderDraft> {
+  return request(`/api/builder/drafts/${id}`)
+}
+
+/** Replaces a builder draft's saved screens (always the full state). */
+export function saveBuilderDraft(id: string, state: BuilderState): Promise<{ id: string; state: BuilderState }> {
+  return request(`/api/builder/drafts/${id}`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(state)
+  })
+}
+
+/** Reads the draft's source once and lists its columns. */
+export function inspectBuilderDraft(id: string): Promise<BuilderInspect> {
+  return request(`/api/builder/drafts/${id}/inspect`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })
+}
+
+/** Suggests places for names from the source, from the places table the draft names. */
+export function suggestBuilderPlaces(id: string, names: string[]): Promise<PlaceSuggestion[]> {
+  return request(`/api/builder/drafts/${id}/places/suggest`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ names })
+  })
+}
+
+/** Runs the draft once into its temporary table and reports what it stored. */
+export function previewBuilderDraft(id: string): Promise<BuilderPreview> {
+  return request(`/api/builder/drafts/${id}/preview`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })
+}
+
+/** Uploads the file an uploaded-file source reads. */
+export function uploadBuilderFile(
+  id: string,
+  slotId: string,
+  file: File,
+  onProgress?: (fraction: number) => void
+): Promise<{ version: UploadedVersion }> {
+  const query = new URLSearchParams({ filename: file.name })
+  return uploadRaw(`/api/builder/drafts/${id}/files/${slotId}?${query}`, file, onProgress)
+}
+
+/** The draft's stored key names, never values. */
+export function listBuilderSecrets(id: string): Promise<{ secrets: { name: string; updatedAt: string }[] }> {
+  return request(`/api/builder/drafts/${id}/secrets`)
+}
+
+/** Stores the draft's API key (admin only). */
+export function setBuilderKey(id: string, value: string): Promise<{ name: string }> {
+  return request(`/api/builder/drafts/${id}/secrets/api_key`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ value })
+  })
+}
+
+/** Installs the draft's source and starts it. */
+export function acceptBuilderDraft(id: string): Promise<BuilderAccept> {
+  return request(`/api/builder/drafts/${id}/accept`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })
 }

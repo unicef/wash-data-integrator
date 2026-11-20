@@ -97,6 +97,9 @@ const ICONS = {
   ),
   library: (
     <path d="M4 5h6v14H4zM14 5h6v14h-6z" />
+  ),
+  steps: (
+    <path d="M4 6h3M4 12h3M4 18h3M10 6h10M10 12h10M10 18h10" />
   )
 }
 
@@ -371,12 +374,17 @@ function Welcome({ home, canDesign }: { home: HomeSummary; canDesign: boolean })
               fact={T`${plural(home.counts.library ?? 0, T`source`, T`sources`)} ready to install`}
             />
           )}
-          {!canAgent && !canLibrary && (
-            <p className="dim">
-              {canDesign
-                ? T`No model is configured and this server has no library, so integrations have to be installed with the CLI.`
-                : T`Ask an editor or administrator to add an integration.`}
-            </p>
+          {canDesign && (
+            <LinkCard
+              href="#/builder"
+              icon="steps"
+              title={T`Add it step by step`}
+              description={T`Give a spreadsheet, dataset, map layer or web address, check a preview, and add it. No code or AI needed.`}
+              fact={T`New source`}
+            />
+          )}
+          {!canDesign && (
+            <p className="dim">{T`Ask an editor or administrator to add an integration.`}</p>
           )}
         </div>
       )}

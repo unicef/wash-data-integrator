@@ -208,6 +208,25 @@ export function IntegrationList({ canDesign }: IntegrationListProps) {
               </svg>
               {T`Import`}
             </button>
+            <button
+              className="secondary"
+              title={T`Add a data source step by step, without code or AI`}
+              onClick={() => (window.location.hash = "#/builder")}
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <path d="M1.5 3h1.5M1.5 6h1.5M1.5 9h1.5M5 3h5.5M5 6h5.5M5 9h5.5" />
+              </svg>
+              {T`New source`}
+            </button>
             <button onClick={onCreate}>
               <svg
                 width="12"

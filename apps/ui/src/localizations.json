@@ -7351,7 +7351,1854 @@
       "es": "Restaurando…",
       "mg": "Mamerina…",
       "sw": "Inarejesha…"
+    },
+    {
+      "_base": "en",
+      "en": "New source",
+      "fr": "New source",
+      "pt": "New source",
+      "es": "New source",
+      "mg": "New source",
+      "sw": "New source"
+    },
+    {
+      "_base": "en",
+      "en": "Viewers cannot add sources. Ask an editor or an admin.",
+      "fr": "Viewers cannot add sources. Ask an editor or an admin.",
+      "pt": "Viewers cannot add sources. Ask an editor or an admin.",
+      "es": "Viewers cannot add sources. Ask an editor or an admin.",
+      "mg": "Viewers cannot add sources. Ask an editor or an admin.",
+      "sw": "Viewers cannot add sources. Ask an editor or an admin."
+    },
+    {
+      "_base": "en",
+      "en": "Starting a new source…",
+      "fr": "Starting a new source…",
+      "pt": "Starting a new source…",
+      "es": "Starting a new source…",
+      "mg": "Starting a new source…",
+      "sw": "Starting a new source…"
+    },
+    {
+      "_base": "en",
+      "en": "Add a data source step by step. Your work is saved at each step: open this page again to go on.",
+      "fr": "Add a data source step by step. Your work is saved at each step: open this page again to go on.",
+      "pt": "Add a data source step by step. Your work is saved at each step: open this page again to go on.",
+      "es": "Add a data source step by step. Your work is saved at each step: open this page again to go on.",
+      "mg": "Add a data source step by step. Your work is saved at each step: open this page again to go on.",
+      "sw": "Add a data source step by step. Your work is saved at each step: open this page again to go on."
+    },
+    {
+      "_base": "en",
+      "en": "Back",
+      "fr": "Back",
+      "pt": "Back",
+      "es": "Back",
+      "mg": "Back",
+      "sw": "Back"
+    },
+    {
+      "_base": "en",
+      "en": "Next",
+      "fr": "Next",
+      "pt": "Next",
+      "es": "Next",
+      "mg": "Next",
+      "sw": "Next"
+    },
+    {
+      "_base": "en",
+      "en": "Runs when a new file is uploaded.",
+      "fr": "Runs when a new file is uploaded.",
+      "pt": "Runs when a new file is uploaded.",
+      "es": "Runs when a new file is uploaded.",
+      "mg": "Runs when a new file is uploaded.",
+      "sw": "Runs when a new file is uploaded."
+    },
+    {
+      "_base": "en",
+      "en": "Runs when data arrives.",
+      "fr": "Runs when data arrives.",
+      "pt": "Runs when data arrives.",
+      "es": "Runs when data arrives.",
+      "mg": "Runs when data arrives.",
+      "sw": "Runs when data arrives."
+    },
+    {
+      "_base": "en",
+      "en": "The source is added",
+      "fr": "The source is added",
+      "pt": "The source is added",
+      "es": "The source is added",
+      "mg": "The source is added",
+      "sw": "The source is added"
+    },
+    {
+      "_base": "en",
+      "en": "The first run has started. The data appears in the table when it finishes.",
+      "fr": "The first run has started. The data appears in the table when it finishes.",
+      "pt": "The first run has started. The data appears in the table when it finishes.",
+      "es": "The first run has started. The data appears in the table when it finishes.",
+      "mg": "The first run has started. The data appears in the table when it finishes.",
+      "sw": "The first run has started. The data appears in the table when it finishes."
+    },
+    {
+      "_base": "en",
+      "en": "Start the first run from the source's page.",
+      "fr": "Start the first run from the source's page.",
+      "pt": "Start the first run from the source's page.",
+      "es": "Start the first run from the source's page.",
+      "mg": "Start the first run from the source's page.",
+      "sw": "Start the first run from the source's page."
+    },
+    {
+      "_base": "en",
+      "en": "Give the other system this address. Each message it sends there adds rows to the table.",
+      "fr": "Give the other system this address. Each message it sends there adds rows to the table.",
+      "pt": "Give the other system this address. Each message it sends there adds rows to the table.",
+      "es": "Give the other system this address. Each message it sends there adds rows to the table.",
+      "mg": "Give the other system this address. Each message it sends there adds rows to the table.",
+      "sw": "Give the other system this address. Each message it sends there adds rows to the table."
+    },
+    {
+      "_base": "en",
+      "en": "Keep the address private: anyone who has it can send data. To test it, run this command in a terminal; it sends the sample message.",
+      "fr": "Keep the address private: anyone who has it can send data. To test it, run this command in a terminal; it sends the sample message.",
+      "pt": "Keep the address private: anyone who has it can send data. To test it, run this command in a terminal; it sends the sample message.",
+      "es": "Keep the address private: anyone who has it can send data. To test it, run this command in a terminal; it sends the sample message.",
+      "mg": "Keep the address private: anyone who has it can send data. To test it, run this command in a terminal; it sends the sample message.",
+      "sw": "Keep the address private: anyone who has it can send data. To test it, run this command in a terminal; it sends the sample message."
+    },
+    {
+      "_base": "en",
+      "en": "Open the source",
+      "fr": "Open the source",
+      "pt": "Open the source",
+      "es": "Open the source",
+      "mg": "Open the source",
+      "sw": "Open the source"
+    },
+    {
+      "_base": "en",
+      "en": "Add another source",
+      "fr": "Add another source",
+      "pt": "Add another source",
+      "es": "Add another source",
+      "mg": "Add another source",
+      "sw": "Add another source"
+    },
+    {
+      "_base": "en",
+      "en": "Check and add",
+      "fr": "Check and add",
+      "pt": "Check and add",
+      "es": "Check and add",
+      "mg": "Check and add",
+      "sw": "Check and add"
+    },
+    {
+      "_base": "en",
+      "en": "Table name",
+      "fr": "Table name",
+      "pt": "Table name",
+      "es": "Table name",
+      "mg": "Table name",
+      "sw": "Table name"
+    },
+    {
+      "_base": "en",
+      "en": "Columns",
+      "fr": "Columns",
+      "pt": "Columns",
+      "es": "Columns",
+      "mg": "Columns",
+      "sw": "Columns"
+    },
+    {
+      "_base": "en",
+      "en": "Places",
+      "fr": "Places",
+      "pt": "Places",
+      "es": "Places",
+      "mg": "Places",
+      "sw": "Places"
+    },
+    {
+      "_base": "en",
+      "en": "{0} matched to {1}",
+      "fr": "{0} matched to {1}",
+      "pt": "{0} matched to {1}",
+      "es": "{0} matched to {1}",
+      "mg": "{0} matched to {1}",
+      "sw": "{0} matched to {1}"
+    },
+    {
+      "_base": "en",
+      "en": "Refreshes",
+      "fr": "Refreshes",
+      "pt": "Refreshes",
+      "es": "Refreshes",
+      "mg": "Refreshes",
+      "sw": "Refreshes"
+    },
+    {
+      "_base": "en",
+      "en": "Adding installs the source here and starts its first run. You can change the schedule later on the source's page.",
+      "fr": "Adding installs the source here and starts its first run. You can change the schedule later on the source's page.",
+      "pt": "Adding installs the source here and starts its first run. You can change the schedule later on the source's page.",
+      "es": "Adding installs the source here and starts its first run. You can change the schedule later on the source's page.",
+      "mg": "Adding installs the source here and starts its first run. You can change the schedule later on the source's page.",
+      "sw": "Adding installs the source here and starts its first run. You can change the schedule later on the source's page."
+    },
+    {
+      "_base": "en",
+      "en": "Adding…",
+      "fr": "Adding…",
+      "pt": "Adding…",
+      "es": "Adding…",
+      "mg": "Adding…",
+      "sw": "Adding…"
+    },
+    {
+      "_base": "en",
+      "en": "Add this source",
+      "fr": "Add this source",
+      "pt": "Add this source",
+      "es": "Add this source",
+      "mg": "Add this source",
+      "sw": "Add this source"
+    },
+    {
+      "_base": "en",
+      "en": "Choose a column for each row filter, or remove it.",
+      "fr": "Choose a column for each row filter, or remove it.",
+      "pt": "Choose a column for each row filter, or remove it.",
+      "es": "Choose a column for each row filter, or remove it.",
+      "mg": "Choose a column for each row filter, or remove it.",
+      "sw": "Choose a column for each row filter, or remove it."
+    },
+    {
+      "_base": "en",
+      "en": "Tick the columns that hold one date each.",
+      "fr": "Tick the columns that hold one date each.",
+      "pt": "Tick the columns that hold one date each.",
+      "es": "Tick the columns that hold one date each.",
+      "mg": "Tick the columns that hold one date each.",
+      "sw": "Tick the columns that hold one date each."
+    },
+    {
+      "_base": "en",
+      "en": "The name \"{0}\" cannot be used. Use lowercase letters, digits and underscores, starting with a letter.",
+      "fr": "The name \"{0}\" cannot be used. Use lowercase letters, digits and underscores, starting with a letter.",
+      "pt": "The name \"{0}\" cannot be used. Use lowercase letters, digits and underscores, starting with a letter.",
+      "es": "The name \"{0}\" cannot be used. Use lowercase letters, digits and underscores, starting with a letter.",
+      "mg": "The name \"{0}\" cannot be used. Use lowercase letters, digits and underscores, starting with a letter.",
+      "sw": "The name \"{0}\" cannot be used. Use lowercase letters, digits and underscores, starting with a letter."
+    },
+    {
+      "_base": "en",
+      "en": "The date column and the value column need different names.",
+      "fr": "The date column and the value column need different names.",
+      "pt": "The date column and the value column need different names.",
+      "es": "The date column and the value column need different names.",
+      "mg": "The date column and the value column need different names.",
+      "sw": "The date column and the value column need different names."
+    },
+    {
+      "_base": "en",
+      "en": "Clean-up (optional)",
+      "fr": "Clean-up (optional)",
+      "pt": "Clean-up (optional)",
+      "es": "Clean-up (optional)",
+      "mg": "Clean-up (optional)",
+      "sw": "Clean-up (optional)"
+    },
+    {
+      "_base": "en",
+      "en": "Most sources need none of this. Skip ahead if the columns looked right.",
+      "fr": "Most sources need none of this. Skip ahead if the columns looked right.",
+      "pt": "Most sources need none of this. Skip ahead if the columns looked right.",
+      "es": "Most sources need none of this. Skip ahead if the columns looked right.",
+      "mg": "Most sources need none of this. Skip ahead if the columns looked right.",
+      "sw": "Most sources need none of this. Skip ahead if the columns looked right."
+    },
+    {
+      "_base": "en",
+      "en": "Skip the first rows",
+      "fr": "Skip the first rows",
+      "pt": "Skip the first rows",
+      "es": "Skip the first rows",
+      "mg": "Skip the first rows",
+      "sw": "Skip the first rows"
+    },
+    {
+      "_base": "en",
+      "en": "For files with a title or notes above the table.",
+      "fr": "For files with a title or notes above the table.",
+      "pt": "For files with a title or notes above the table.",
+      "es": "For files with a title or notes above the table.",
+      "mg": "For files with a title or notes above the table.",
+      "sw": "For files with a title or notes above the table."
+    },
+    {
+      "_base": "en",
+      "en": "Column names are on row",
+      "fr": "Column names are on row",
+      "pt": "Column names are on row",
+      "es": "Column names are on row",
+      "mg": "Column names are on row",
+      "sw": "Column names are on row"
+    },
+    {
+      "_base": "en",
+      "en": "Counted after the skipped rows. Leave empty when they are on the first row.",
+      "fr": "Counted after the skipped rows. Leave empty when they are on the first row.",
+      "pt": "Counted after the skipped rows. Leave empty when they are on the first row.",
+      "es": "Counted after the skipped rows. Leave empty when they are on the first row.",
+      "mg": "Counted after the skipped rows. Leave empty when they are on the first row.",
+      "sw": "Counted after the skipped rows. Leave empty when they are on the first row."
+    },
+    {
+      "_base": "en",
+      "en": "Keep only some rows",
+      "fr": "Keep only some rows",
+      "pt": "Keep only some rows",
+      "es": "Keep only some rows",
+      "mg": "Keep only some rows",
+      "sw": "Keep only some rows"
+    },
+    {
+      "_base": "en",
+      "en": "All rows are kept.",
+      "fr": "All rows are kept.",
+      "pt": "All rows are kept.",
+      "es": "All rows are kept.",
+      "mg": "All rows are kept.",
+      "sw": "All rows are kept."
+    },
+    {
+      "_base": "en",
+      "en": "Choose a column",
+      "fr": "Choose a column",
+      "pt": "Choose a column",
+      "es": "Choose a column",
+      "mg": "Choose a column",
+      "sw": "Choose a column"
+    },
+    {
+      "_base": "en",
+      "en": "How to compare",
+      "fr": "How to compare",
+      "pt": "How to compare",
+      "es": "How to compare",
+      "mg": "How to compare",
+      "sw": "How to compare"
+    },
+    {
+      "_base": "en",
+      "en": "is",
+      "fr": "is",
+      "pt": "is",
+      "es": "is",
+      "mg": "is",
+      "sw": "is"
+    },
+    {
+      "_base": "en",
+      "en": "contains",
+      "fr": "contains",
+      "pt": "contains",
+      "es": "contains",
+      "mg": "contains",
+      "sw": "contains"
+    },
+    {
+      "_base": "en",
+      "en": "Value",
+      "fr": "Value",
+      "pt": "Value",
+      "es": "Value",
+      "mg": "Value",
+      "sw": "Value"
+    },
+    {
+      "_base": "en",
+      "en": "Remove",
+      "fr": "Remove",
+      "pt": "Remove",
+      "es": "Remove",
+      "mg": "Remove",
+      "sw": "Remove"
+    },
+    {
+      "_base": "en",
+      "en": "Add a row filter",
+      "fr": "Add a row filter",
+      "pt": "Add a row filter",
+      "es": "Add a row filter",
+      "mg": "Add a row filter",
+      "sw": "Add a row filter"
+    },
+    {
+      "_base": "en",
+      "en": "Upper and lower case are treated the same.",
+      "fr": "Upper and lower case are treated the same.",
+      "pt": "Upper and lower case are treated the same.",
+      "es": "Upper and lower case are treated the same.",
+      "mg": "Upper and lower case are treated the same.",
+      "sw": "Upper and lower case are treated the same."
+    },
+    {
+      "_base": "en",
+      "en": "Dates across the columns",
+      "fr": "Dates across the columns",
+      "pt": "Dates across the columns",
+      "es": "Dates across the columns",
+      "mg": "Dates across the columns",
+      "sw": "Dates across the columns"
+    },
+    {
+      "_base": "en",
+      "en": "The table has one column per date, month or year",
+      "fr": "The table has one column per date, month or year",
+      "pt": "The table has one column per date, month or year",
+      "es": "The table has one column per date, month or year",
+      "mg": "The table has one column per date, month or year",
+      "sw": "The table has one column per date, month or year"
+    },
+    {
+      "_base": "en",
+      "en": "These columns are turned into two: one for the date and one for the value.",
+      "fr": "These columns are turned into two: one for the date and one for the value.",
+      "pt": "These columns are turned into two: one for the date and one for the value.",
+      "es": "These columns are turned into two: one for the date and one for the value.",
+      "mg": "These columns are turned into two: one for the date and one for the value.",
+      "sw": "These columns are turned into two: one for the date and one for the value."
+    },
+    {
+      "_base": "en",
+      "en": "Name of the date column",
+      "fr": "Name of the date column",
+      "pt": "Name of the date column",
+      "es": "Name of the date column",
+      "mg": "Name of the date column",
+      "sw": "Name of the date column"
+    },
+    {
+      "_base": "en",
+      "en": "Name of the value column",
+      "fr": "Name of the value column",
+      "pt": "Name of the value column",
+      "es": "Name of the value column",
+      "mg": "Name of the value column",
+      "sw": "Name of the value column"
+    },
+    {
+      "_base": "en",
+      "en": "Text",
+      "fr": "Text",
+      "pt": "Text",
+      "es": "Text",
+      "mg": "Text",
+      "sw": "Text"
+    },
+    {
+      "_base": "en",
+      "en": "Number",
+      "fr": "Number",
+      "pt": "Number",
+      "es": "Number",
+      "mg": "Number",
+      "sw": "Number"
+    },
+    {
+      "_base": "en",
+      "en": "Date",
+      "fr": "Date",
+      "pt": "Date",
+      "es": "Date",
+      "mg": "Date",
+      "sw": "Date"
+    },
+    {
+      "_base": "en",
+      "en": "Place (region, district or other area)",
+      "fr": "Place (region, district or other area)",
+      "pt": "Place (region, district or other area)",
+      "es": "Place (region, district or other area)",
+      "mg": "Place (region, district or other area)",
+      "sw": "Place (region, district or other area)"
+    },
+    {
+      "_base": "en",
+      "en": "Keep at least one column.",
+      "fr": "Keep at least one column.",
+      "pt": "Keep at least one column.",
+      "es": "Keep at least one column.",
+      "mg": "Keep at least one column.",
+      "sw": "Keep at least one column."
+    },
+    {
+      "_base": "en",
+      "en": "Two columns are called \"{0}\". Give each column its own name.",
+      "fr": "Two columns are called \"{0}\". Give each column its own name.",
+      "pt": "Two columns are called \"{0}\". Give each column its own name.",
+      "es": "Two columns are called \"{0}\". Give each column its own name.",
+      "mg": "Two columns are called \"{0}\". Give each column its own name.",
+      "sw": "Two columns are called \"{0}\". Give each column its own name."
+    },
+    {
+      "_base": "en",
+      "en": "Only one column can be a place.",
+      "fr": "Only one column can be a place.",
+      "pt": "Only one column can be a place.",
+      "es": "Only one column can be a place.",
+      "mg": "Only one column can be a place.",
+      "sw": "Only one column can be a place."
+    },
+    {
+      "_base": "en",
+      "en": "Choose the column that identifies each row.",
+      "fr": "Choose the column that identifies each row.",
+      "pt": "Choose the column that identifies each row.",
+      "es": "Choose the column that identifies each row.",
+      "mg": "Choose the column that identifies each row.",
+      "sw": "Choose the column that identifies each row."
+    },
+    {
+      "_base": "en",
+      "en": "Which columns do you want?",
+      "fr": "Which columns do you want?",
+      "pt": "Which columns do you want?",
+      "es": "Which columns do you want?",
+      "mg": "Which columns do you want?",
+      "sw": "Which columns do you want?"
+    },
+    {
+      "_base": "en",
+      "en": "Reading the source…",
+      "fr": "Reading the source…",
+      "pt": "Reading the source…",
+      "es": "Reading the source…",
+      "mg": "Reading the source…",
+      "sw": "Reading the source…"
+    },
+    {
+      "_base": "en",
+      "en": "The source has not been read yet.",
+      "fr": "The source has not been read yet.",
+      "pt": "The source has not been read yet.",
+      "es": "The source has not been read yet.",
+      "mg": "The source has not been read yet.",
+      "sw": "The source has not been read yet."
+    },
+    {
+      "_base": "en",
+      "en": "Read the source",
+      "fr": "Read the source",
+      "pt": "Read the source",
+      "es": "Read the source",
+      "mg": "Read the source",
+      "sw": "Read the source"
+    },
+    {
+      "_base": "en",
+      "en": "Found {0} columns in {1} rows read. Untick the columns you do not need, give each a name for the table, and say what kind of values it holds.",
+      "fr": "Found {0} columns in {1} rows read. Untick the columns you do not need, give each a name for the table, and say what kind of values it holds.",
+      "pt": "Found {0} columns in {1} rows read. Untick the columns you do not need, give each a name for the table, and say what kind of values it holds.",
+      "es": "Found {0} columns in {1} rows read. Untick the columns you do not need, give each a name for the table, and say what kind of values it holds.",
+      "mg": "Found {0} columns in {1} rows read. Untick the columns you do not need, give each a name for the table, and say what kind of values it holds.",
+      "sw": "Found {0} columns in {1} rows read. Untick the columns you do not need, give each a name for the table, and say what kind of values it holds."
+    },
+    {
+      "_base": "en",
+      "en": "These columns are no longer in the source and were left out: {0}",
+      "fr": "These columns are no longer in the source and were left out: {0}",
+      "pt": "These columns are no longer in the source and were left out: {0}",
+      "es": "These columns are no longer in the source and were left out: {0}",
+      "mg": "These columns are no longer in the source and were left out: {0}",
+      "sw": "These columns are no longer in the source and were left out: {0}"
+    },
+    {
+      "_base": "en",
+      "en": "Keep",
+      "fr": "Keep",
+      "pt": "Keep",
+      "es": "Keep",
+      "mg": "Keep",
+      "sw": "Keep"
+    },
+    {
+      "_base": "en",
+      "en": "Column in the source",
+      "fr": "Column in the source",
+      "pt": "Column in the source",
+      "es": "Column in the source",
+      "mg": "Column in the source",
+      "sw": "Column in the source"
+    },
+    {
+      "_base": "en",
+      "en": "Name in the table",
+      "fr": "Name in the table",
+      "pt": "Name in the table",
+      "es": "Name in the table",
+      "mg": "Name in the table",
+      "sw": "Name in the table"
+    },
+    {
+      "_base": "en",
+      "en": "Kind of values",
+      "fr": "Kind of values",
+      "pt": "Kind of values",
+      "es": "Kind of values",
+      "mg": "Kind of values",
+      "sw": "Kind of values"
+    },
+    {
+      "_base": "en",
+      "en": "Unit (optional)",
+      "fr": "Unit (optional)",
+      "pt": "Unit (optional)",
+      "es": "Unit (optional)",
+      "mg": "Unit (optional)",
+      "sw": "Unit (optional)"
+    },
+    {
+      "_base": "en",
+      "en": "Keep {0}",
+      "fr": "Keep {0}",
+      "pt": "Keep {0}",
+      "es": "Keep {0}",
+      "mg": "Keep {0}",
+      "sw": "Keep {0}"
+    },
+    {
+      "_base": "en",
+      "en": "Name in the table for {0}",
+      "fr": "Name in the table for {0}",
+      "pt": "Name in the table for {0}",
+      "es": "Name in the table for {0}",
+      "mg": "Name in the table for {0}",
+      "sw": "Name in the table for {0}"
+    },
+    {
+      "_base": "en",
+      "en": "Kind of values in {0}",
+      "fr": "Kind of values in {0}",
+      "pt": "Kind of values in {0}",
+      "es": "Kind of values in {0}",
+      "mg": "Kind of values in {0}",
+      "sw": "Kind of values in {0}"
+    },
+    {
+      "_base": "en",
+      "en": "e.g. mm",
+      "fr": "e.g. mm",
+      "pt": "e.g. mm",
+      "es": "e.g. mm",
+      "mg": "e.g. mm",
+      "sw": "e.g. mm"
+    },
+    {
+      "_base": "en",
+      "en": "Unit of {0}",
+      "fr": "Unit of {0}",
+      "pt": "Unit of {0}",
+      "es": "Unit of {0}",
+      "mg": "Unit of {0}",
+      "sw": "Unit of {0}"
+    },
+    {
+      "_base": "en",
+      "en": "Names in the table use lowercase letters, digits and underscores. A place column also gets a second column with the place code.",
+      "fr": "Names in the table use lowercase letters, digits and underscores. A place column also gets a second column with the place code.",
+      "pt": "Names in the table use lowercase letters, digits and underscores. A place column also gets a second column with the place code.",
+      "es": "Names in the table use lowercase letters, digits and underscores. A place column also gets a second column with the place code.",
+      "mg": "Names in the table use lowercase letters, digits and underscores. A place column also gets a second column with the place code.",
+      "sw": "Names in the table use lowercase letters, digits and underscores. A place column also gets a second column with the place code."
+    },
+    {
+      "_base": "en",
+      "en": "On each refresh",
+      "fr": "On each refresh",
+      "pt": "On each refresh",
+      "es": "On each refresh",
+      "mg": "On each refresh",
+      "sw": "On each refresh"
+    },
+    {
+      "_base": "en",
+      "en": "Replace all rows with what the source has now",
+      "fr": "Replace all rows with what the source has now",
+      "pt": "Replace all rows with what the source has now",
+      "es": "Replace all rows with what the source has now",
+      "mg": "Replace all rows with what the source has now",
+      "sw": "Replace all rows with what the source has now"
+    },
+    {
+      "_base": "en",
+      "en": "Update rows that are already there and add new ones",
+      "fr": "Update rows that are already there and add new ones",
+      "pt": "Update rows that are already there and add new ones",
+      "es": "Update rows that are already there and add new ones",
+      "mg": "Update rows that are already there and add new ones",
+      "sw": "Update rows that are already there and add new ones"
+    },
+    {
+      "_base": "en",
+      "en": "Column that identifies each row",
+      "fr": "Column that identifies each row",
+      "pt": "Column that identifies each row",
+      "es": "Column that identifies each row",
+      "mg": "Column that identifies each row",
+      "sw": "Column that identifies each row"
+    },
+    {
+      "_base": "en",
+      "en": "Rows with the same value here are the same record, for example a station id.",
+      "fr": "Rows with the same value here are the same record, for example a station id.",
+      "pt": "Rows with the same value here are the same record, for example a station id.",
+      "es": "Rows with the same value here are the same record, for example a station id.",
+      "mg": "Rows with the same value here are the same record, for example a station id.",
+      "sw": "Rows with the same value here are the same record, for example a station id."
+    },
+    {
+      "_base": "en",
+      "en": "Read the source again",
+      "fr": "Read the source again",
+      "pt": "Read the source again",
+      "es": "Read the source again",
+      "mg": "Read the source again",
+      "sw": "Read the source again"
+    },
+    {
+      "_base": "en",
+      "en": "Choose the places table and its name and code columns.",
+      "fr": "Choose the places table and its name and code columns.",
+      "pt": "Choose the places table and its name and code columns.",
+      "es": "Choose the places table and its name and code columns.",
+      "mg": "Choose the places table and its name and code columns.",
+      "sw": "Choose the places table and its name and code columns."
+    },
+    {
+      "_base": "en",
+      "en": "Find the matches first, or go back and mark no column as a place.",
+      "fr": "Find the matches first, or go back and mark no column as a place.",
+      "pt": "Find the matches first, or go back and mark no column as a place.",
+      "es": "Find the matches first, or go back and mark no column as a place.",
+      "mg": "Find the matches first, or go back and mark no column as a place.",
+      "sw": "Find the matches first, or go back and mark no column as a place."
+    },
+    {
+      "_base": "en",
+      "en": "Match places",
+      "fr": "Match places",
+      "pt": "Match places",
+      "es": "Match places",
+      "mg": "Match places",
+      "sw": "Match places"
+    },
+    {
+      "_base": "en",
+      "en": "No column is marked as a place, so there is nothing to match. Go back to Columns to mark one, or go on.",
+      "fr": "No column is marked as a place, so there is nothing to match. Go back to Columns to mark one, or go on.",
+      "pt": "No column is marked as a place, so there is nothing to match. Go back to Columns to mark one, or go on.",
+      "es": "No column is marked as a place, so there is nothing to match. Go back to Columns to mark one, or go on.",
+      "mg": "No column is marked as a place, so there is nothing to match. Go back to Columns to mark one, or go on.",
+      "sw": "No column is marked as a place, so there is nothing to match. Go back to Columns to mark one, or go on."
+    },
+    {
+      "_base": "en",
+      "en": "The names in {0} are matched to the places in a table that is already here, such as a country's regions or districts. Each row then gets the place code too.",
+      "fr": "The names in {0} are matched to the places in a table that is already here, such as a country's regions or districts. Each row then gets the place code too.",
+      "pt": "The names in {0} are matched to the places in a table that is already here, such as a country's regions or districts. Each row then gets the place code too.",
+      "es": "The names in {0} are matched to the places in a table that is already here, such as a country's regions or districts. Each row then gets the place code too.",
+      "mg": "The names in {0} are matched to the places in a table that is already here, such as a country's regions or districts. Each row then gets the place code too.",
+      "sw": "The names in {0} are matched to the places in a table that is already here, such as a country's regions or districts. Each row then gets the place code too."
+    },
+    {
+      "_base": "en",
+      "en": "Places table",
+      "fr": "Places table",
+      "pt": "Places table",
+      "es": "Places table",
+      "mg": "Places table",
+      "sw": "Places table"
+    },
+    {
+      "_base": "en",
+      "en": "The table that lists the places with their names and codes.",
+      "fr": "The table that lists the places with their names and codes.",
+      "pt": "The table that lists the places with their names and codes.",
+      "es": "The table that lists the places with their names and codes.",
+      "mg": "The table that lists the places with their names and codes.",
+      "sw": "The table that lists the places with their names and codes."
+    },
+    {
+      "_base": "en",
+      "en": "Choose a table",
+      "fr": "Choose a table",
+      "pt": "Choose a table",
+      "es": "Choose a table",
+      "mg": "Choose a table",
+      "sw": "Choose a table"
+    },
+    {
+      "_base": "en",
+      "en": "Name column",
+      "fr": "Name column",
+      "pt": "Name column",
+      "es": "Name column",
+      "mg": "Name column",
+      "sw": "Name column"
+    },
+    {
+      "_base": "en",
+      "en": "Holds the place names.",
+      "fr": "Holds the place names.",
+      "pt": "Holds the place names.",
+      "es": "Holds the place names.",
+      "mg": "Holds the place names.",
+      "sw": "Holds the place names."
+    },
+    {
+      "_base": "en",
+      "en": "Code column",
+      "fr": "Code column",
+      "pt": "Code column",
+      "es": "Code column",
+      "mg": "Code column",
+      "sw": "Code column"
+    },
+    {
+      "_base": "en",
+      "en": "Holds the place codes.",
+      "fr": "Holds the place codes.",
+      "pt": "Holds the place codes.",
+      "es": "Holds the place codes.",
+      "mg": "Holds the place codes.",
+      "sw": "Holds the place codes."
+    },
+    {
+      "_base": "en",
+      "en": "Finding matches…",
+      "fr": "Finding matches…",
+      "pt": "Finding matches…",
+      "es": "Finding matches…",
+      "mg": "Finding matches…",
+      "sw": "Finding matches…"
+    },
+    {
+      "_base": "en",
+      "en": "Find the matches again",
+      "fr": "Find the matches again",
+      "pt": "Find the matches again",
+      "es": "Find the matches again",
+      "mg": "Find the matches again",
+      "sw": "Find the matches again"
+    },
+    {
+      "_base": "en",
+      "en": "Find the matches",
+      "fr": "Find the matches",
+      "pt": "Find the matches",
+      "es": "Find the matches",
+      "mg": "Find the matches",
+      "sw": "Find the matches"
+    },
+    {
+      "_base": "en",
+      "en": "Reading the source and comparing the names. This can take a minute.",
+      "fr": "Reading the source and comparing the names. This can take a minute.",
+      "pt": "Reading the source and comparing the names. This can take a minute.",
+      "es": "Reading the source and comparing the names. This can take a minute.",
+      "mg": "Reading the source and comparing the names. This can take a minute.",
+      "sw": "Reading the source and comparing the names. This can take a minute."
+    },
+    {
+      "_base": "en",
+      "en": "{0} names: {1} matched, {2} left unmatched.",
+      "fr": "{0} names: {1} matched, {2} left unmatched.",
+      "pt": "{0} names: {1} matched, {2} left unmatched.",
+      "es": "{0} names: {1} matched, {2} left unmatched.",
+      "mg": "{0} names: {1} matched, {2} left unmatched.",
+      "sw": "{0} names: {1} matched, {2} left unmatched."
+    },
+    {
+      "_base": "en",
+      "en": "Names that are the same are chosen for you. Check the others: pick the right place from the list, or leave the name unmatched. Rows with an unmatched name are still kept.",
+      "fr": "Names that are the same are chosen for you. Check the others: pick the right place from the list, or leave the name unmatched. Rows with an unmatched name are still kept.",
+      "pt": "Names that are the same are chosen for you. Check the others: pick the right place from the list, or leave the name unmatched. Rows with an unmatched name are still kept.",
+      "es": "Names that are the same are chosen for you. Check the others: pick the right place from the list, or leave the name unmatched. Rows with an unmatched name are still kept.",
+      "mg": "Names that are the same are chosen for you. Check the others: pick the right place from the list, or leave the name unmatched. Rows with an unmatched name are still kept.",
+      "sw": "Names that are the same are chosen for you. Check the others: pick the right place from the list, or leave the name unmatched. Rows with an unmatched name are still kept."
+    },
+    {
+      "_base": "en",
+      "en": "Name in the source",
+      "fr": "Name in the source",
+      "pt": "Name in the source",
+      "es": "Name in the source",
+      "mg": "Name in the source",
+      "sw": "Name in the source"
+    },
+    {
+      "_base": "en",
+      "en": "Place",
+      "fr": "Place",
+      "pt": "Place",
+      "es": "Place",
+      "mg": "Place",
+      "sw": "Place"
+    },
+    {
+      "_base": "en",
+      "en": "Place for {0}",
+      "fr": "Place for {0}",
+      "pt": "Place for {0}",
+      "es": "Place for {0}",
+      "mg": "Place for {0}",
+      "sw": "Place for {0}"
+    },
+    {
+      "_base": "en",
+      "en": "{0} ({1}), same name",
+      "fr": "{0} ({1}), same name",
+      "pt": "{0} ({1}), same name",
+      "es": "{0} ({1}), same name",
+      "mg": "{0} ({1}), same name",
+      "sw": "{0} ({1}), same name"
+    },
+    {
+      "_base": "en",
+      "en": "{0} ({1}), similar name",
+      "fr": "{0} ({1}), similar name",
+      "pt": "{0} ({1}), similar name",
+      "es": "{0} ({1}), similar name",
+      "mg": "{0} ({1}), similar name",
+      "sw": "{0} ({1}), similar name"
+    },
+    {
+      "_base": "en",
+      "en": "Code {0}, chosen before",
+      "fr": "Code {0}, chosen before",
+      "pt": "Code {0}, chosen before",
+      "es": "Code {0}, chosen before",
+      "mg": "Code {0}, chosen before",
+      "sw": "Code {0}, chosen before"
+    },
+    {
+      "_base": "en",
+      "en": "Leave unmatched",
+      "fr": "Leave unmatched",
+      "pt": "Leave unmatched",
+      "es": "Leave unmatched",
+      "mg": "Leave unmatched",
+      "sw": "Leave unmatched"
+    },
+    {
+      "_base": "en",
+      "en": "The preview found no place names in this column.",
+      "fr": "The preview found no place names in this column.",
+      "pt": "The preview found no place names in this column.",
+      "es": "The preview found no place names in this column.",
+      "mg": "The preview found no place names in this column.",
+      "sw": "The preview found no place names in this column."
+    },
+    {
+      "_base": "en",
+      "en": "The source is read once into a temporary table. Nothing is saved for others to see until you add the source.",
+      "fr": "The source is read once into a temporary table. Nothing is saved for others to see until you add the source.",
+      "pt": "The source is read once into a temporary table. Nothing is saved for others to see until you add the source.",
+      "es": "The source is read once into a temporary table. Nothing is saved for others to see until you add the source.",
+      "mg": "The source is read once into a temporary table. Nothing is saved for others to see until you add the source.",
+      "sw": "The source is read once into a temporary table. Nothing is saved for others to see until you add the source."
+    },
+    {
+      "_base": "en",
+      "en": "Running the preview. This can take up to two minutes.",
+      "fr": "Running the preview. This can take up to two minutes.",
+      "pt": "Running the preview. This can take up to two minutes.",
+      "es": "Running the preview. This can take up to two minutes.",
+      "mg": "Running the preview. This can take up to two minutes.",
+      "sw": "Running the preview. This can take up to two minutes."
+    },
+    {
+      "_base": "en",
+      "en": "row would be stored",
+      "fr": "row would be stored",
+      "pt": "row would be stored",
+      "es": "row would be stored",
+      "mg": "row would be stored",
+      "sw": "row would be stored"
+    },
+    {
+      "_base": "en",
+      "en": "rows would be stored",
+      "fr": "rows would be stored",
+      "pt": "rows would be stored",
+      "es": "rows would be stored",
+      "mg": "rows would be stored",
+      "sw": "rows would be stored"
+    },
+    {
+      "_base": "en",
+      "en": "(the first {0} are shown below)",
+      "fr": "(the first {0} are shown below)",
+      "pt": "(the first {0} are shown below)",
+      "es": "(the first {0} are shown below)",
+      "mg": "(the first {0} are shown below)",
+      "sw": "(the first {0} are shown below)"
+    },
+    {
+      "_base": "en",
+      "en": "place names matched",
+      "fr": "place names matched",
+      "pt": "place names matched",
+      "es": "place names matched",
+      "mg": "place names matched",
+      "sw": "place names matched"
+    },
+    {
+      "_base": "en",
+      "en": "not matched",
+      "fr": "not matched",
+      "pt": "not matched",
+      "es": "not matched",
+      "mg": "not matched",
+      "sw": "not matched"
+    },
+    {
+      "_base": "en",
+      "en": "values did not fit their column",
+      "fr": "values did not fit their column",
+      "pt": "values did not fit their column",
+      "es": "values did not fit their column",
+      "mg": "values did not fit their column",
+      "sw": "values did not fit their column"
+    },
+    {
+      "_base": "en",
+      "en": "Place names not matched",
+      "fr": "Place names not matched",
+      "pt": "Place names not matched",
+      "es": "Place names not matched",
+      "mg": "Place names not matched",
+      "sw": "Place names not matched"
+    },
+    {
+      "_base": "en",
+      "en": "These rows are kept without a place code. Go back to Places to match them.",
+      "fr": "These rows are kept without a place code. Go back to Places to match them.",
+      "pt": "These rows are kept without a place code. Go back to Places to match them.",
+      "es": "These rows are kept without a place code. Go back to Places to match them.",
+      "mg": "These rows are kept without a place code. Go back to Places to match them.",
+      "sw": "These rows are kept without a place code. Go back to Places to match them."
+    },
+    {
+      "_base": "en",
+      "en": "Values that did not fit",
+      "fr": "Values that did not fit",
+      "pt": "Values that did not fit",
+      "es": "Values that did not fit",
+      "mg": "Values that did not fit",
+      "sw": "Values that did not fit"
+    },
+    {
+      "_base": "en",
+      "en": "These values are left empty. Go back to Columns to change the kind of values, or fix them in the source.",
+      "fr": "These values are left empty. Go back to Columns to change the kind of values, or fix them in the source.",
+      "pt": "These values are left empty. Go back to Columns to change the kind of values, or fix them in the source.",
+      "es": "These values are left empty. Go back to Columns to change the kind of values, or fix them in the source.",
+      "mg": "These values are left empty. Go back to Columns to change the kind of values, or fix them in the source.",
+      "sw": "These values are left empty. Go back to Columns to change the kind of values, or fix them in the source."
+    },
+    {
+      "_base": "en",
+      "en": "The preview stored no rows. Check the source and the clean-up settings.",
+      "fr": "The preview stored no rows. Check the source and the clean-up settings.",
+      "pt": "The preview stored no rows. Check the source and the clean-up settings.",
+      "es": "The preview stored no rows. Check the source and the clean-up settings.",
+      "mg": "The preview stored no rows. Check the source and the clean-up settings.",
+      "sw": "The preview stored no rows. Check the source and the clean-up settings."
+    },
+    {
+      "_base": "en",
+      "en": "Run the preview again",
+      "fr": "Run the preview again",
+      "pt": "Run the preview again",
+      "es": "Run the preview again",
+      "mg": "Run the preview again",
+      "sw": "Run the preview again"
+    },
+    {
+      "_base": "en",
+      "en": "Give the source a name.",
+      "fr": "Give the source a name.",
+      "pt": "Give the source a name.",
+      "es": "Give the source a name.",
+      "mg": "Give the source a name.",
+      "sw": "Give the source a name."
+    },
+    {
+      "_base": "en",
+      "en": "The table name cannot be used. Use lowercase letters, digits and underscores, starting with a letter.",
+      "fr": "The table name cannot be used. Use lowercase letters, digits and underscores, starting with a letter.",
+      "pt": "The table name cannot be used. Use lowercase letters, digits and underscores, starting with a letter.",
+      "es": "The table name cannot be used. Use lowercase letters, digits and underscores, starting with a letter.",
+      "mg": "The table name cannot be used. Use lowercase letters, digits and underscores, starting with a letter.",
+      "sw": "The table name cannot be used. Use lowercase letters, digits and underscores, starting with a letter."
+    },
+    {
+      "_base": "en",
+      "en": "Name and schedule",
+      "fr": "Name and schedule",
+      "pt": "Name and schedule",
+      "es": "Name and schedule",
+      "mg": "Name and schedule",
+      "sw": "Name and schedule"
+    },
+    {
+      "_base": "en",
+      "en": "The name people see in lists and on dashboards.",
+      "fr": "The name people see in lists and on dashboards.",
+      "pt": "The name people see in lists and on dashboards.",
+      "es": "The name people see in lists and on dashboards.",
+      "mg": "The name people see in lists and on dashboards.",
+      "sw": "The name people see in lists and on dashboards."
+    },
+    {
+      "_base": "en",
+      "en": "The name of the table the data is saved in. Lowercase letters, digits and underscores. It cannot change later.",
+      "fr": "The name of the table the data is saved in. Lowercase letters, digits and underscores. It cannot change later.",
+      "pt": "The name of the table the data is saved in. Lowercase letters, digits and underscores. It cannot change later.",
+      "es": "The name of the table the data is saved in. Lowercase letters, digits and underscores. It cannot change later.",
+      "mg": "The name of the table the data is saved in. Lowercase letters, digits and underscores. It cannot change later.",
+      "sw": "The name of the table the data is saved in. Lowercase letters, digits and underscores. It cannot change later."
+    },
+    {
+      "_base": "en",
+      "en": "How often it refreshes",
+      "fr": "How often it refreshes",
+      "pt": "How often it refreshes",
+      "es": "How often it refreshes",
+      "mg": "How often it refreshes",
+      "sw": "How often it refreshes"
+    },
+    {
+      "_base": "en",
+      "en": "Times are in UTC. Manual only means it refreshes only when someone starts it.",
+      "fr": "Times are in UTC. Manual only means it refreshes only when someone starts it.",
+      "pt": "Times are in UTC. Manual only means it refreshes only when someone starts it.",
+      "es": "Times are in UTC. Manual only means it refreshes only when someone starts it.",
+      "mg": "Times are in UTC. Manual only means it refreshes only when someone starts it.",
+      "sw": "Times are in UTC. Manual only means it refreshes only when someone starts it."
+    },
+    {
+      "_base": "en",
+      "en": "About the data",
+      "fr": "About the data",
+      "pt": "About the data",
+      "es": "About the data",
+      "mg": "About the data",
+      "sw": "About the data"
+    },
+    {
+      "_base": "en",
+      "en": "Provider (optional)",
+      "fr": "Provider (optional)",
+      "pt": "Provider (optional)",
+      "es": "Provider (optional)",
+      "mg": "Provider (optional)",
+      "sw": "Provider (optional)"
+    },
+    {
+      "_base": "en",
+      "en": "Who publishes the data, for example Ministry of Health.",
+      "fr": "Who publishes the data, for example Ministry of Health.",
+      "pt": "Who publishes the data, for example Ministry of Health.",
+      "es": "Who publishes the data, for example Ministry of Health.",
+      "mg": "Who publishes the data, for example Ministry of Health.",
+      "sw": "Who publishes the data, for example Ministry of Health."
+    },
+    {
+      "_base": "en",
+      "en": "Licence (optional)",
+      "fr": "Licence (optional)",
+      "pt": "Licence (optional)",
+      "es": "Licence (optional)",
+      "mg": "Licence (optional)",
+      "sw": "Licence (optional)"
+    },
+    {
+      "_base": "en",
+      "en": "The terms the data may be used under, for example CC-BY-4.0.",
+      "fr": "The terms the data may be used under, for example CC-BY-4.0.",
+      "pt": "The terms the data may be used under, for example CC-BY-4.0.",
+      "es": "The terms the data may be used under, for example CC-BY-4.0.",
+      "mg": "The terms the data may be used under, for example CC-BY-4.0.",
+      "sw": "The terms the data may be used under, for example CC-BY-4.0."
+    },
+    {
+      "_base": "en",
+      "en": "Limitations (optional)",
+      "fr": "Limitations (optional)",
+      "pt": "Limitations (optional)",
+      "es": "Limitations (optional)",
+      "mg": "Limitations (optional)",
+      "sw": "Limitations (optional)"
+    },
+    {
+      "_base": "en",
+      "en": "What people should know before using the data: gaps, delays, how accurate it is.",
+      "fr": "What people should know before using the data: gaps, delays, how accurate it is.",
+      "pt": "What people should know before using the data: gaps, delays, how accurate it is.",
+      "es": "What people should know before using the data: gaps, delays, how accurate it is.",
+      "mg": "What people should know before using the data: gaps, delays, how accurate it is.",
+      "sw": "What people should know before using the data: gaps, delays, how accurate it is."
+    },
+    {
+      "_base": "en",
+      "en": "The sample must be one message in curly brackets { }.",
+      "fr": "The sample must be one message in curly brackets { }.",
+      "pt": "The sample must be one message in curly brackets { }.",
+      "es": "The sample must be one message in curly brackets { }.",
+      "mg": "The sample must be one message in curly brackets { }.",
+      "sw": "The sample must be one message in curly brackets { }."
+    },
+    {
+      "_base": "en",
+      "en": "This is not valid JSON yet. Check for missing quotes, commas or brackets.",
+      "fr": "This is not valid JSON yet. Check for missing quotes, commas or brackets.",
+      "pt": "This is not valid JSON yet. Check for missing quotes, commas or brackets.",
+      "es": "This is not valid JSON yet. Check for missing quotes, commas or brackets.",
+      "mg": "This is not valid JSON yet. Check for missing quotes, commas or brackets.",
+      "sw": "This is not valid JSON yet. Check for missing quotes, commas or brackets."
+    },
+    {
+      "_base": "en",
+      "en": "Give the data a name.",
+      "fr": "Give the data a name.",
+      "pt": "Give the data a name.",
+      "es": "Give the data a name.",
+      "mg": "Give the data a name.",
+      "sw": "Give the data a name."
+    },
+    {
+      "_base": "en",
+      "en": "Choose where the data comes from.",
+      "fr": "Choose where the data comes from.",
+      "pt": "Choose where the data comes from.",
+      "es": "Choose where the data comes from.",
+      "mg": "Choose where the data comes from.",
+      "sw": "Choose where the data comes from."
+    },
+    {
+      "_base": "en",
+      "en": "Paste the web address.",
+      "fr": "Paste the web address.",
+      "pt": "Paste the web address.",
+      "es": "Paste the web address.",
+      "mg": "Paste the web address.",
+      "sw": "Paste the web address."
+    },
+    {
+      "_base": "en",
+      "en": "Paste the address of the HDX dataset.",
+      "fr": "Paste the address of the HDX dataset.",
+      "pt": "Paste the address of the HDX dataset.",
+      "es": "Paste the address of the HDX dataset.",
+      "mg": "Paste the address of the HDX dataset.",
+      "sw": "Paste the address of the HDX dataset."
+    },
+    {
+      "_base": "en",
+      "en": "Paste the id of the file in the dataset.",
+      "fr": "Paste the id of the file in the dataset.",
+      "pt": "Paste the id of the file in the dataset.",
+      "es": "Paste the id of the file in the dataset.",
+      "mg": "Paste the id of the file in the dataset.",
+      "sw": "Paste the id of the file in the dataset."
+    },
+    {
+      "_base": "en",
+      "en": "Paste the address of the layer.",
+      "fr": "Paste the address of the layer.",
+      "pt": "Paste the address of the layer.",
+      "es": "Paste the address of the layer.",
+      "mg": "Paste the address of the layer.",
+      "sw": "Paste the address of the layer."
+    },
+    {
+      "_base": "en",
+      "en": "Paste one sample message in JSON.",
+      "fr": "Paste one sample message in JSON.",
+      "pt": "Paste one sample message in JSON.",
+      "es": "Paste one sample message in JSON.",
+      "mg": "Paste one sample message in JSON.",
+      "sw": "Paste one sample message in JSON."
+    },
+    {
+      "_base": "en",
+      "en": "Where does the data come from?",
+      "fr": "Where does the data come from?",
+      "pt": "Where does the data come from?",
+      "es": "Where does the data come from?",
+      "mg": "Where does the data come from?",
+      "sw": "Where does the data come from?"
+    },
+    {
+      "_base": "en",
+      "en": "A short name people will see, for example Cholera cases by region.",
+      "fr": "A short name people will see, for example Cholera cases by region.",
+      "pt": "A short name people will see, for example Cholera cases by region.",
+      "es": "A short name people will see, for example Cholera cases by region.",
+      "mg": "A short name people will see, for example Cholera cases by region.",
+      "sw": "A short name people will see, for example Cholera cases by region."
+    },
+    {
+      "_base": "en",
+      "en": "Kind of source",
+      "fr": "Kind of source",
+      "pt": "Kind of source",
+      "es": "Kind of source",
+      "mg": "Kind of source",
+      "sw": "Kind of source"
+    },
+    {
+      "_base": "en",
+      "en": "Web address",
+      "fr": "Web address",
+      "pt": "Web address",
+      "es": "Web address",
+      "mg": "Web address",
+      "sw": "Web address"
+    },
+    {
+      "_base": "en",
+      "en": "The link to the CSV or Excel file. For a Google Sheet, use File, Share, Publish to web, and copy the CSV link.",
+      "fr": "The link to the CSV or Excel file. For a Google Sheet, use File, Share, Publish to web, and copy the CSV link.",
+      "pt": "The link to the CSV or Excel file. For a Google Sheet, use File, Share, Publish to web, and copy the CSV link.",
+      "es": "The link to the CSV or Excel file. For a Google Sheet, use File, Share, Publish to web, and copy the CSV link.",
+      "mg": "The link to the CSV or Excel file. For a Google Sheet, use File, Share, Publish to web, and copy the CSV link.",
+      "sw": "The link to the CSV or Excel file. For a Google Sheet, use File, Share, Publish to web, and copy the CSV link."
+    },
+    {
+      "_base": "en",
+      "en": "Sheet (optional)",
+      "fr": "Sheet (optional)",
+      "pt": "Sheet (optional)",
+      "es": "Sheet (optional)",
+      "mg": "Sheet (optional)",
+      "sw": "Sheet (optional)"
+    },
+    {
+      "_base": "en",
+      "en": "For an Excel file with more than one sheet. Leave empty to read the first sheet.",
+      "fr": "For an Excel file with more than one sheet. Leave empty to read the first sheet.",
+      "pt": "For an Excel file with more than one sheet. Leave empty to read the first sheet.",
+      "es": "For an Excel file with more than one sheet. Leave empty to read the first sheet.",
+      "mg": "For an Excel file with more than one sheet. Leave empty to read the first sheet.",
+      "sw": "For an Excel file with more than one sheet. Leave empty to read the first sheet."
+    },
+    {
+      "_base": "en",
+      "en": "Dataset address",
+      "fr": "Dataset address",
+      "pt": "Dataset address",
+      "es": "Dataset address",
+      "mg": "Dataset address",
+      "sw": "Dataset address"
+    },
+    {
+      "_base": "en",
+      "en": "The address of the dataset page on data.humdata.org.",
+      "fr": "The address of the dataset page on data.humdata.org.",
+      "pt": "The address of the dataset page on data.humdata.org.",
+      "es": "The address of the dataset page on data.humdata.org.",
+      "mg": "The address of the dataset page on data.humdata.org.",
+      "sw": "The address of the dataset page on data.humdata.org."
+    },
+    {
+      "_base": "en",
+      "en": "File id",
+      "fr": "File id",
+      "pt": "File id",
+      "es": "File id",
+      "mg": "File id",
+      "sw": "File id"
+    },
+    {
+      "_base": "en",
+      "en": "On the dataset page, open the file you want. Its address ends in /resource/ followed by the id: copy that id here.",
+      "fr": "On the dataset page, open the file you want. Its address ends in /resource/ followed by the id: copy that id here.",
+      "pt": "On the dataset page, open the file you want. Its address ends in /resource/ followed by the id: copy that id here.",
+      "es": "On the dataset page, open the file you want. Its address ends in /resource/ followed by the id: copy that id here.",
+      "mg": "On the dataset page, open the file you want. Its address ends in /resource/ followed by the id: copy that id here.",
+      "sw": "On the dataset page, open the file you want. Its address ends in /resource/ followed by the id: copy that id here."
+    },
+    {
+      "_base": "en",
+      "en": "Layer address",
+      "fr": "Layer address",
+      "pt": "Layer address",
+      "es": "Layer address",
+      "mg": "Layer address",
+      "sw": "Layer address"
+    },
+    {
+      "_base": "en",
+      "en": "The address of one layer, ending in /FeatureServer/ and a number, for example /FeatureServer/0.",
+      "fr": "The address of one layer, ending in /FeatureServer/ and a number, for example /FeatureServer/0.",
+      "pt": "The address of one layer, ending in /FeatureServer/ and a number, for example /FeatureServer/0.",
+      "es": "The address of one layer, ending in /FeatureServer/ and a number, for example /FeatureServer/0.",
+      "mg": "The address of one layer, ending in /FeatureServer/ and a number, for example /FeatureServer/0.",
+      "sw": "The address of one layer, ending in /FeatureServer/ and a number, for example /FeatureServer/0."
+    },
+    {
+      "_base": "en",
+      "en": "Sample message",
+      "fr": "Sample message",
+      "pt": "Sample message",
+      "es": "Sample message",
+      "mg": "Sample message",
+      "sw": "Sample message"
+    },
+    {
+      "_base": "en",
+      "en": "Paste one message the other system sends, in JSON. Its fields become the columns.",
+      "fr": "Paste one message the other system sends, in JSON. Its fields become the columns.",
+      "pt": "Paste one message the other system sends, in JSON. Its fields become the columns.",
+      "es": "Paste one message the other system sends, in JSON. Its fields become the columns.",
+      "mg": "Paste one message the other system sends, in JSON. Its fields become the columns.",
+      "sw": "Paste one message the other system sends, in JSON. Its fields become the columns."
+    },
+    {
+      "_base": "en",
+      "en": "The address that answers with the records.",
+      "fr": "The address that answers with the records.",
+      "pt": "The address that answers with the records.",
+      "es": "The address that answers with the records.",
+      "mg": "The address that answers with the records.",
+      "sw": "The address that answers with the records."
+    },
+    {
+      "_base": "en",
+      "en": "Where the records are (optional)",
+      "fr": "Where the records are (optional)",
+      "pt": "Where the records are (optional)",
+      "es": "Where the records are (optional)",
+      "mg": "Where the records are (optional)",
+      "sw": "Where the records are (optional)"
+    },
+    {
+      "_base": "en",
+      "en": "If the list of records sits inside the answer, give its path, for example data.items. Leave empty when the answer is the list.",
+      "fr": "If the list of records sits inside the answer, give its path, for example data.items. Leave empty when the answer is the list.",
+      "pt": "If the list of records sits inside the answer, give its path, for example data.items. Leave empty when the answer is the list.",
+      "es": "If the list of records sits inside the answer, give its path, for example data.items. Leave empty when the answer is the list.",
+      "mg": "If the list of records sits inside the answer, give its path, for example data.items. Leave empty when the answer is the list.",
+      "sw": "If the list of records sits inside the answer, give its path, for example data.items. Leave empty when the answer is the list."
+    },
+    {
+      "_base": "en",
+      "en": "More than one page",
+      "fr": "More than one page",
+      "pt": "More than one page",
+      "es": "More than one page",
+      "mg": "More than one page",
+      "sw": "More than one page"
+    },
+    {
+      "_base": "en",
+      "en": "How the address gives the rest of the records when they do not fit in one answer.",
+      "fr": "How the address gives the rest of the records when they do not fit in one answer.",
+      "pt": "How the address gives the rest of the records when they do not fit in one answer.",
+      "es": "How the address gives the rest of the records when they do not fit in one answer.",
+      "mg": "How the address gives the rest of the records when they do not fit in one answer.",
+      "sw": "How the address gives the rest of the records when they do not fit in one answer."
+    },
+    {
+      "_base": "en",
+      "en": "All records come in one answer",
+      "fr": "All records come in one answer",
+      "pt": "All records come in one answer",
+      "es": "All records come in one answer",
+      "mg": "All records come in one answer",
+      "sw": "All records come in one answer"
+    },
+    {
+      "_base": "en",
+      "en": "Numbered pages",
+      "fr": "Numbered pages",
+      "pt": "Numbered pages",
+      "es": "Numbered pages",
+      "mg": "Numbered pages",
+      "sw": "Numbered pages"
+    },
+    {
+      "_base": "en",
+      "en": "Each answer links to the next page",
+      "fr": "Each answer links to the next page",
+      "pt": "Each answer links to the next page",
+      "es": "Each answer links to the next page",
+      "mg": "Each answer links to the next page",
+      "sw": "Each answer links to the next page"
+    },
+    {
+      "_base": "en",
+      "en": "Page setting name",
+      "fr": "Page setting name",
+      "pt": "Page setting name",
+      "es": "Page setting name",
+      "mg": "Page setting name",
+      "sw": "Page setting name"
+    },
+    {
+      "_base": "en",
+      "en": "The name in the address that picks the page, often page.",
+      "fr": "The name in the address that picks the page, often page.",
+      "pt": "The name in the address that picks the page, often page.",
+      "es": "The name in the address that picks the page, often page.",
+      "mg": "The name in the address that picks the page, often page.",
+      "sw": "The name in the address that picks the page, often page."
+    },
+    {
+      "_base": "en",
+      "en": "First page number",
+      "fr": "First page number",
+      "pt": "First page number",
+      "es": "First page number",
+      "mg": "First page number",
+      "sw": "First page number"
+    },
+    {
+      "_base": "en",
+      "en": "Usually 1, sometimes 0.",
+      "fr": "Usually 1, sometimes 0.",
+      "pt": "Usually 1, sometimes 0.",
+      "es": "Usually 1, sometimes 0.",
+      "mg": "Usually 1, sometimes 0.",
+      "sw": "Usually 1, sometimes 0."
+    },
+    {
+      "_base": "en",
+      "en": "Where the next link is",
+      "fr": "Where the next link is",
+      "pt": "Where the next link is",
+      "es": "Where the next link is",
+      "mg": "Where the next link is",
+      "sw": "Where the next link is"
+    },
+    {
+      "_base": "en",
+      "en": "The path of the next page's address in the answer, for example links.next.",
+      "fr": "The path of the next page's address in the answer, for example links.next.",
+      "pt": "The path of the next page's address in the answer, for example links.next.",
+      "es": "The path of the next page's address in the answer, for example links.next.",
+      "mg": "The path of the next page's address in the answer, for example links.next.",
+      "sw": "The path of the next page's address in the answer, for example links.next."
+    },
+    {
+      "_base": "en",
+      "en": "Key",
+      "fr": "Key",
+      "pt": "Key",
+      "es": "Key",
+      "mg": "Key",
+      "sw": "Key"
+    },
+    {
+      "_base": "en",
+      "en": "Open to anyone, no key needed",
+      "fr": "Open to anyone, no key needed",
+      "pt": "Open to anyone, no key needed",
+      "es": "Open to anyone, no key needed",
+      "mg": "Open to anyone, no key needed",
+      "sw": "Open to anyone, no key needed"
+    },
+    {
+      "_base": "en",
+      "en": "Needs a key",
+      "fr": "Needs a key",
+      "pt": "Needs a key",
+      "es": "Needs a key",
+      "mg": "Needs a key",
+      "sw": "Needs a key"
+    },
+    {
+      "_base": "en",
+      "en": "Key goes in",
+      "fr": "Key goes in",
+      "pt": "Key goes in",
+      "es": "Key goes in",
+      "mg": "Key goes in",
+      "sw": "Key goes in"
+    },
+    {
+      "_base": "en",
+      "en": "The name the key is sent under. With Authorization the key is sent as a Bearer key.",
+      "fr": "The name the key is sent under. With Authorization the key is sent as a Bearer key.",
+      "pt": "The name the key is sent under. With Authorization the key is sent as a Bearer key.",
+      "es": "The name the key is sent under. With Authorization the key is sent as a Bearer key.",
+      "mg": "The name the key is sent under. With Authorization the key is sent as a Bearer key.",
+      "sw": "The name the key is sent under. With Authorization the key is sent as a Bearer key."
+    },
+    {
+      "_base": "en",
+      "en": "key added",
+      "fr": "key added",
+      "pt": "key added",
+      "es": "key added",
+      "mg": "key added",
+      "sw": "key added"
+    },
+    {
+      "_base": "en",
+      "en": "The key is stored encrypted and cannot be shown again.",
+      "fr": "The key is stored encrypted and cannot be shown again.",
+      "pt": "The key is stored encrypted and cannot be shown again.",
+      "es": "The key is stored encrypted and cannot be shown again.",
+      "mg": "The key is stored encrypted and cannot be shown again.",
+      "sw": "The key is stored encrypted and cannot be shown again."
+    },
+    {
+      "_base": "en",
+      "en": "waiting",
+      "fr": "waiting",
+      "pt": "waiting",
+      "es": "waiting",
+      "mg": "waiting",
+      "sw": "waiting"
+    },
+    {
+      "_base": "en",
+      "en": "Waiting for an admin to add the key. Your work is saved: send an admin the address of this page.",
+      "fr": "Waiting for an admin to add the key. Your work is saved: send an admin the address of this page.",
+      "pt": "Waiting for an admin to add the key. Your work is saved: send an admin the address of this page.",
+      "es": "Waiting for an admin to add the key. Your work is saved: send an admin the address of this page.",
+      "mg": "Waiting for an admin to add the key. Your work is saved: send an admin the address of this page.",
+      "sw": "Waiting for an admin to add the key. Your work is saved: send an admin the address of this page."
+    },
+    {
+      "_base": "en",
+      "en": "Replace the key",
+      "fr": "Replace the key",
+      "pt": "Replace the key",
+      "es": "Replace the key",
+      "mg": "Replace the key",
+      "sw": "Replace the key"
+    },
+    {
+      "_base": "en",
+      "en": "Only admins can add keys. It is never shown again.",
+      "fr": "Only admins can add keys. It is never shown again.",
+      "pt": "Only admins can add keys. It is never shown again.",
+      "es": "Only admins can add keys. It is never shown again.",
+      "mg": "Only admins can add keys. It is never shown again.",
+      "sw": "Only admins can add keys. It is never shown again."
+    },
+    {
+      "_base": "en",
+      "en": "Save key",
+      "fr": "Save key",
+      "pt": "Save key",
+      "es": "Save key",
+      "mg": "Save key",
+      "sw": "Save key"
+    },
+    {
+      "_base": "en",
+      "en": "A CSV or Excel file. You can upload a newer file later to refresh the data.",
+      "fr": "A CSV or Excel file. You can upload a newer file later to refresh the data.",
+      "pt": "A CSV or Excel file. You can upload a newer file later to refresh the data.",
+      "es": "A CSV or Excel file. You can upload a newer file later to refresh the data.",
+      "mg": "A CSV or Excel file. You can upload a newer file later to refresh the data.",
+      "sw": "A CSV or Excel file. You can upload a newer file later to refresh the data."
+    },
+    {
+      "_base": "en",
+      "en": "Uploading… {0}%",
+      "fr": "Uploading… {0}%",
+      "pt": "Uploading… {0}%",
+      "es": "Uploading… {0}%",
+      "mg": "Uploading… {0}%",
+      "sw": "Uploading… {0}%"
+    },
+    {
+      "_base": "en",
+      "en": "Uploaded: {0}",
+      "fr": "Uploaded: {0}",
+      "pt": "Uploaded: {0}",
+      "es": "Uploaded: {0}",
+      "mg": "Uploaded: {0}",
+      "sw": "Uploaded: {0}"
+    },
+    {
+      "_base": "en",
+      "en": "If you uploaded a file earlier in this draft, it is kept: you can go on, or upload again to replace it.",
+      "fr": "If you uploaded a file earlier in this draft, it is kept: you can go on, or upload again to replace it.",
+      "pt": "If you uploaded a file earlier in this draft, it is kept: you can go on, or upload again to replace it.",
+      "es": "If you uploaded a file earlier in this draft, it is kept: you can go on, or upload again to replace it.",
+      "mg": "If you uploaded a file earlier in this draft, it is kept: you can go on, or upload again to replace it.",
+      "sw": "If you uploaded a file earlier in this draft, it is kept: you can go on, or upload again to replace it."
+    },
+    {
+      "_base": "en",
+      "en": "Clean-up",
+      "fr": "Clean-up",
+      "pt": "Clean-up",
+      "es": "Clean-up",
+      "mg": "Clean-up",
+      "sw": "Clean-up"
+    },
+    {
+      "_base": "en",
+      "en": "Add",
+      "fr": "Add",
+      "pt": "Add",
+      "es": "Add",
+      "mg": "Add",
+      "sw": "Add"
+    },
+    {
+      "_base": "en",
+      "en": "Spreadsheet or CSV at a link",
+      "fr": "Spreadsheet or CSV at a link",
+      "pt": "Spreadsheet or CSV at a link",
+      "es": "Spreadsheet or CSV at a link",
+      "mg": "Spreadsheet or CSV at a link",
+      "sw": "Spreadsheet or CSV at a link"
+    },
+    {
+      "_base": "en",
+      "en": "HDX dataset",
+      "fr": "HDX dataset",
+      "pt": "HDX dataset",
+      "es": "HDX dataset",
+      "mg": "HDX dataset",
+      "sw": "HDX dataset"
+    },
+    {
+      "_base": "en",
+      "en": "ArcGIS feature service",
+      "fr": "ArcGIS feature service",
+      "pt": "ArcGIS feature service",
+      "es": "ArcGIS feature service",
+      "mg": "ArcGIS feature service",
+      "sw": "ArcGIS feature service"
+    },
+    {
+      "_base": "en",
+      "en": "Web API (JSON)",
+      "fr": "Web API (JSON)",
+      "pt": "Web API (JSON)",
+      "es": "Web API (JSON)",
+      "mg": "Web API (JSON)",
+      "sw": "Web API (JSON)"
+    },
+    {
+      "_base": "en",
+      "en": "Uploaded file",
+      "fr": "Uploaded file",
+      "pt": "Uploaded file",
+      "es": "Uploaded file",
+      "mg": "Uploaded file",
+      "sw": "Uploaded file"
+    },
+    {
+      "_base": "en",
+      "en": "Pushed data (webhook)",
+      "fr": "Pushed data (webhook)",
+      "pt": "Pushed data (webhook)",
+      "es": "Pushed data (webhook)",
+      "mg": "Pushed data (webhook)",
+      "sw": "Pushed data (webhook)"
+    },
+    {
+      "_base": "en",
+      "en": "A CSV or Excel file anyone can open from a web address, such as a shared Google Sheet.",
+      "fr": "A CSV or Excel file anyone can open from a web address, such as a shared Google Sheet.",
+      "pt": "A CSV or Excel file anyone can open from a web address, such as a shared Google Sheet.",
+      "es": "A CSV or Excel file anyone can open from a web address, such as a shared Google Sheet.",
+      "mg": "A CSV or Excel file anyone can open from a web address, such as a shared Google Sheet.",
+      "sw": "A CSV or Excel file anyone can open from a web address, such as a shared Google Sheet."
+    },
+    {
+      "_base": "en",
+      "en": "A file from a dataset on the Humanitarian Data Exchange.",
+      "fr": "A file from a dataset on the Humanitarian Data Exchange.",
+      "pt": "A file from a dataset on the Humanitarian Data Exchange.",
+      "es": "A file from a dataset on the Humanitarian Data Exchange.",
+      "mg": "A file from a dataset on the Humanitarian Data Exchange.",
+      "sw": "A file from a dataset on the Humanitarian Data Exchange."
+    },
+    {
+      "_base": "en",
+      "en": "A map layer published on ArcGIS Online or an ArcGIS server.",
+      "fr": "A map layer published on ArcGIS Online or an ArcGIS server.",
+      "pt": "A map layer published on ArcGIS Online or an ArcGIS server.",
+      "es": "A map layer published on ArcGIS Online or an ArcGIS server.",
+      "mg": "A map layer published on ArcGIS Online or an ArcGIS server.",
+      "sw": "A map layer published on ArcGIS Online or an ArcGIS server."
+    },
+    {
+      "_base": "en",
+      "en": "A web address that answers with records in JSON.",
+      "fr": "A web address that answers with records in JSON.",
+      "pt": "A web address that answers with records in JSON.",
+      "es": "A web address that answers with records in JSON.",
+      "mg": "A web address that answers with records in JSON.",
+      "sw": "A web address that answers with records in JSON."
+    },
+    {
+      "_base": "en",
+      "en": "A CSV or Excel file you upload here. Uploading a new file refreshes the data.",
+      "fr": "A CSV or Excel file you upload here. Uploading a new file refreshes the data.",
+      "pt": "A CSV or Excel file you upload here. Uploading a new file refreshes the data.",
+      "es": "A CSV or Excel file you upload here. Uploading a new file refreshes the data.",
+      "mg": "A CSV or Excel file you upload here. Uploading a new file refreshes the data.",
+      "sw": "A CSV or Excel file you upload here. Uploading a new file refreshes the data."
+    },
+    {
+      "_base": "en",
+      "en": "Another system sends the data here as it happens, for example a sensor.",
+      "fr": "Another system sends the data here as it happens, for example a sensor.",
+      "pt": "Another system sends the data here as it happens, for example a sensor.",
+      "es": "Another system sends the data here as it happens, for example a sensor.",
+      "mg": "Another system sends the data here as it happens, for example a sensor.",
+      "sw": "Another system sends the data here as it happens, for example a sensor."
+    },
+    {
+      "_base": "en",
+      "en": "Add it step by step",
+      "fr": "Add it step by step",
+      "pt": "Add it step by step",
+      "es": "Add it step by step",
+      "mg": "Add it step by step",
+      "sw": "Add it step by step"
+    },
+    {
+      "_base": "en",
+      "en": "Give a spreadsheet, dataset, map layer or web address, check a preview, and add it. No code or AI needed.",
+      "fr": "Give a spreadsheet, dataset, map layer or web address, check a preview, and add it. No code or AI needed.",
+      "pt": "Give a spreadsheet, dataset, map layer or web address, check a preview, and add it. No code or AI needed.",
+      "es": "Give a spreadsheet, dataset, map layer or web address, check a preview, and add it. No code or AI needed.",
+      "mg": "Give a spreadsheet, dataset, map layer or web address, check a preview, and add it. No code or AI needed.",
+      "sw": "Give a spreadsheet, dataset, map layer or web address, check a preview, and add it. No code or AI needed."
+    },
+    {
+      "_base": "en",
+      "en": "Add a data source step by step, without code or AI",
+      "fr": "Add a data source step by step, without code or AI",
+      "pt": "Add a data source step by step, without code or AI",
+      "es": "Add a data source step by step, without code or AI",
+      "mg": "Add a data source step by step, without code or AI",
+      "sw": "Add a data source step by step, without code or AI"
     }
   ],
-  "unused": []
+  "unused": [
+    "No model is configured and this server has no library, so integrations have to be installed with the CLI."
+  ]
 }
