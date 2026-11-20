@@ -23,7 +23,7 @@ import { queryRows } from "../queryApi.js"
 import { RasterStore } from "../rasterStore.js"
 import { cleanupScratch, draftSchema } from "../scratch.js"
 import { getDraftSecrets, getSecrets, listDraftSecrets, loadSecretKey, MissingSecretError, setDraftSecret, setSecret } from "../secrets.js"
-import { buildDefinition, validateRecipe } from "./buildDefinition.js"
+import { buildDefinition, PLACES_INPUT, validateRecipe } from "./buildDefinition.js"
 import { CONNECTORS } from "./connectors.js"
 import type { ConnectorRegistry } from "../library.js"
 import { checkLink, Resolver } from "./linkSafety.js"
@@ -43,8 +43,6 @@ const MAX_NAMES = 5000
 const TYPE_ERROR_LIMIT = 50
 /** The only secret a builder draft holds. */
 const KEY_NAME = "api_key"
-/** The input id a places table is declared under (the connectors read it by this name). */
-const PLACES_INPUT = "places"
 
 /** What accepting a draft returns. */
 export interface AcceptResult {
@@ -78,8 +76,37 @@ export interface DraftState {
   recipe?: Recipe
   /** Set by the server when the draft edits an installed source: accepting updates that one integration */
   editing?: string
-  /** Set by the server while the draft's key is the installed source's copied key (dropped if the source's host changes) */
+  /** Set by the server while the draft's key is the installed source's copied key */
   keyCopied?: boolean
+  /**
+   * Set by the server when a key is added (admin) or copied (edit draft): the
+   * origins of the source addresses at that moment. The key is dropped as
+   * soon as an address points to another origin. Never set by clients.
+   */
+  keyOrigins?: KeyOrigins
+}
+
+/** The origin (scheme, host and port) of each source address a key was given for; null when unset. */
+export type KeyOrigins = Record<(typeof ADDRESS_FIELDS)[number], string | null>
+
+/** The source fields a connector sends requests to. */
+const ADDRESS_FIELDS = ["url", "layerUrl"] as const
+
+/** The origin of an address, null when empty; text that is not a URL is its own origin. */
+function originOf(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") return null
+  try {
+    const url = new URL(String(value))
+    return url.origin === "null" ? `${url.protocol}//${url.host}` : url.origin
+  } catch {
+    return "invalid:" + String(value)
+  }
+}
+
+/** The origins of a source's addresses. */
+function keyOriginsOf(source: Record<string, unknown> | undefined): KeyOrigins {
+  const s = source ?? {}
+  return { url: originOf(s.url), layerUrl: originOf(s.layerUrl) }
 }
 
 /** One builder draft as its routes see it. */
@@ -186,6 +213,9 @@ export class BuilderService {
       const existing = await client.query("SELECT client_state FROM app.agent_sessions WHERE id = $1", [id])
       // The edit target is the server's: a client never sets or drops it
       const editing = existing.rows[0]?.client_state?.editing
+      // So are the origins a key was given for
+      const keyOrigins = existing.rows[0]?.client_state?.keyOrigins
+      if (keyOrigins && typeof keyOrigins === "object") state.keyOrigins = keyOrigins
       if (typeof editing === "string") {
         state.editing = editing
         state.id = editing
@@ -199,7 +229,10 @@ export class BuilderService {
         id,
         JSON.stringify(state)
       ])
-      if (await this.dropCopiedKeyOnOriginChange(client, id, state as DraftState)) delete state.keyCopied
+      if (await this.dropKeyOnOriginChange(client, id, state as DraftState)) {
+        delete state.keyCopied
+        delete state.keyOrigins
+      }
       await client.query("COMMIT")
     } catch (err) {
       await client.query("ROLLBACK").catch(() => {})
@@ -233,7 +266,9 @@ export class BuilderService {
       trigger: definition.trigger,
       recipe: { ...definition.recipe, config: config as unknown as Recipe["config"] },
       editing: integrationId,
-      ...(definition.secrets?.includes(KEY_NAME) ? { keyCopied: true } : {})
+      ...(definition.secrets?.includes(KEY_NAME)
+        ? { keyCopied: true, keyOrigins: keyOriginsOf(definition.recipe.config.source) }
+        : {})
     }
     const created = await this.pool.query(
       `INSERT INTO app.agent_sessions (kind, user_id, status, client_state) VALUES ('builder', $1, 'active', $2) RETURNING id`,
@@ -250,7 +285,7 @@ export class BuilderService {
 
   /** Runs the connector in inspect mode and returns its inspect.json: columns with samples, and the row count. */
   async inspect(draft: Draft): Promise<unknown> {
-    await this.dropCopiedKeyOnOriginChange(this.pool, draft.id, draft.state)
+    await this.dropKeyOnOriginChange(this.pool, draft.id, draft.state)
     const definition = await this.runDefinition(draft, "inspect")
     let inspected: unknown = null
     const status = await this.run(draft, definition, async outDir => {
@@ -264,7 +299,7 @@ export class BuilderService {
 
   /** Runs the connector in preview mode into the draft schema and reports the first rows and the counts. */
   async preview(draft: Draft): Promise<PreviewResult> {
-    await this.dropCopiedKeyOnOriginChange(this.pool, draft.id, draft.state)
+    await this.dropKeyOnOriginChange(this.pool, draft.id, draft.state)
     const definition = await this.runDefinition(draft, "preview")
     const outcome = await this.run(draft, definition)
     if (outcome.status !== "succeeded") throw new BuilderError(422, `The preview failed: ${outcome.error ?? outcome.status}`)
@@ -304,48 +339,57 @@ export class BuilderService {
     return suggestMatches(names, rows)
   }
 
-  /** Stores the draft's key, encrypted; the value is never returned. */
+  /**
+   * Stores the draft's key, encrypted; the value is never returned. The key
+   * is tied to the origins of the draft's source addresses as saved now.
+   */
   async setKey(draft: Draft, value: unknown): Promise<void> {
     if (typeof value !== "string" || value.length === 0 || value.length > 65536) {
       throw new BuilderError(400, "The key must be 1 to 65536 characters.")
     }
-    await setDraftSecret(this.pool, this.secretKey(), draft.id, KEY_NAME, value)
-    // An admin's own key for this draft is no longer the copied one
-    await this.pool.query(
-      "UPDATE app.agent_sessions SET client_state = client_state - 'keyCopied' WHERE id = $1 AND client_state ? 'keyCopied'",
-      [draft.id]
-    )
+    const secretKey = this.secretKey()
+    // Under the draft's key lock, so a save cannot slip between reading the addresses and storing the key
+    const client = await this.pool.connect()
+    try {
+      await client.query("BEGIN")
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`builder-key:${draft.id}`])
+      const row = await client.query("SELECT client_state FROM app.agent_sessions WHERE id = $1", [draft.id])
+      const state = (row.rows[0]?.client_state ?? {}) as DraftState
+      await setDraftSecret(client, secretKey, draft.id, KEY_NAME, value)
+      // An admin's own key for this draft is no longer the copied one
+      await client.query(
+        "UPDATE app.agent_sessions SET client_state = (client_state - 'keyCopied') || jsonb_build_object('keyOrigins', $2::jsonb) WHERE id = $1",
+        [draft.id, JSON.stringify(keyOriginsOf(state.recipe?.config?.source))]
+      )
+      await client.query("COMMIT")
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => {})
+      throw err
+    } finally {
+      client.release()
+    }
   }
 
   /**
-   * An edit draft keeps the installed source's copied key only while every
-   * source address (url, layerUrl) keeps the installed source's origin
-   * (scheme, host and port); otherwise the key is deleted, so no other
-   * address ever receives it. Checks the given state, the one a run or an
+   * A draft keeps its key (an admin's or one copied from the installed
+   * source) only while every source address (url, layerUrl) keeps the origin
+   * (scheme, host and port) it had when the key was given; otherwise the key
+   * is deleted, so no other address ever receives it. An emptied address
+   * sends nothing and is allowed. Checks the given state, the one a run or an
    * install is about to use. Returns whether the key was dropped.
    */
-  private async dropCopiedKeyOnOriginChange(
+  private async dropKeyOnOriginChange(
     db: Pick<pg.PoolClient, "query">,
     draftId: string,
     state: DraftState
   ): Promise<boolean> {
-    if (!state.editing || state.keyCopied !== true) return false
-    const installed = await db.query("SELECT definition FROM app.integrations WHERE id = $1", [state.editing])
-    const before = (installed.rows[0]?.definition as IntegrationDefinition | undefined)?.recipe?.config?.source ?? {}
-    const after = state.recipe?.config?.source ?? {}
-    const origin = (value: unknown): string | null => {
-      if (value === undefined || value === null || value === "") return null
-      try {
-        const url = new URL(String(value))
-        return url.origin === "null" ? `${url.protocol}//${url.host}` : url.origin
-      } catch {
-        return "invalid:" + String(value)
-      }
-    }
-    const same = ["url", "layerUrl"].every(field => origin(after[field]) === null || origin(after[field]) === origin(before[field]))
+    const given = state.keyOrigins
+    if (!given || typeof given !== "object") return false
+    const now = keyOriginsOf(state.recipe?.config?.source)
+    const same = ADDRESS_FIELDS.every(field => now[field] === null || now[field] === (given[field] ?? null))
     if (same) return false
     await db.query("DELETE FROM app.draft_secrets WHERE session_id = $1 AND name = $2", [draftId, KEY_NAME])
-    await db.query(`UPDATE app.agent_sessions SET client_state = client_state - 'keyCopied' WHERE id = $1`, [draftId])
+    await db.query(`UPDATE app.agent_sessions SET client_state = client_state - 'keyCopied' - 'keyOrigins' WHERE id = $1`, [draftId])
     return true
   }
 
@@ -370,7 +414,7 @@ export class BuilderService {
       held.push(draftLock)
       const fresh = await this.find(draft.id, user)
       if (!fresh) throw new BuilderError(404, "unknown draft")
-      await this.dropCopiedKeyOnOriginChange(this.pool, fresh.id, fresh.state)
+      await this.dropKeyOnOriginChange(this.pool, fresh.id, fresh.state)
       const { id, recipe } = fresh.state
       if (!id) throw new BuilderError(400, "Give the source an id before accepting it.")
       if (!recipe) throw new BuilderError(400, "Choose a connector before accepting the source.")
@@ -394,6 +438,8 @@ export class BuilderService {
     } catch (err) {
       throw new BuilderError(400, err instanceof Error ? err.message : String(err))
     }
+    // An address changed after the preview is checked again
+    await this.checkLinks(recipe)
     const editing = draft.state.editing
     let installed: IntegrationDefinition | null = null
     let installedStatus: "draft" | "ready" = "ready"
@@ -542,6 +588,20 @@ export class BuilderService {
     return result
   }
 
+  /** Refuses a recipe whose source addresses are not safe public links (checkLink). */
+  private async checkLinks(recipe: Recipe): Promise<void> {
+    const source = recipe.config.source
+    for (const field of ADDRESS_FIELDS) {
+      const value = source[field]
+      if (value === undefined || value === null || value === "") continue
+      try {
+        await checkLink(String(value), this.options.resolve)
+      } catch (err) {
+        throw new BuilderError(400, err instanceof Error ? err.message : String(err))
+      }
+    }
+  }
+
   /** The encryption key for draft secrets, or 503 when the deployment has none. */
   private secretKey(): Buffer {
     const configured = this.options.executor?.secretKey
@@ -568,16 +628,7 @@ export class BuilderService {
       throw new BuilderError(400, err instanceof Error ? err.message : String(err))
     }
     // Refused before any run row exists
-    const source = recipe.config.source
-    for (const field of ["url", "layerUrl"]) {
-      const value = source[field]
-      if (value === undefined || value === null || value === "") continue
-      try {
-        await checkLink(String(value), this.options.resolve)
-      } catch (err) {
-        throw new BuilderError(400, err instanceof Error ? err.message : String(err))
-      }
-    }
+    await this.checkLinks(recipe)
     const places = recipe.config.places
     if (places) {
       if (typeof places.table !== "string" || !ID_PATTERN.test(places.table)) {

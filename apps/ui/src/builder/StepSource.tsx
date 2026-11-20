@@ -291,6 +291,8 @@ function KeyBox({ model }: { model: BuilderModel }) {
     setBusy(true)
     setError(null)
     try {
+      // The key is tied to the address saved with the draft, so the address is saved first
+      await model.save()
       await setBuilderKey(model.draftId, value)
       setValue("")
       await refresh()

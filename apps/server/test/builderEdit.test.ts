@@ -236,6 +236,46 @@ test("edit_accept_after_host_change_needs_admin_key", async () => {
   assert.equal((await getSecrets(pool, key, "edit_key_c", ["api_key"])).api_key, "new-key-456789")
 })
 
+/** A new keyed web_api draft with an admin's key. */
+async function adminKeyed(id: string): Promise<string> {
+  const draftId = await newDraft()
+  await saveDraft(draftId, draftState(id, "web_api", { url: "https://data.example.org/api", auth: "key" }))
+  const set = await call(`/api/builder/drafts/${draftId}/secrets/api_key`, admin, { method: "PUT", body: JSON.stringify({ value: "admin-key-123456" }) })
+  assert.equal(set.status, 200)
+  return draftId
+}
+
+test("admin_key_dropped_when_editor_changes_origin", async () => {
+  HOSTS["evil.example.net"] = ["93.184.215.15"]
+  const draftId = await adminKeyed("admin_key_moved")
+  assert.equal(await keyRows(draftId), 1)
+  // A client cannot move the key's origins itself: keyOrigins in the body is ignored
+  const got = (await (await call(`/api/builder/drafts/${draftId}`, editor)).json()) as { state: Record<string, any> }
+  const state = got.state
+  state.keyOrigins = { url: "https://evil.example.net", layerUrl: null }
+  state.recipe.config.source = { ...state.recipe.config.source, url: "https://evil.example.net/api" }
+  await saveDraft(draftId, state)
+  assert.equal(await keyRows(draftId), 0)
+  const preview = await call(`/api/builder/drafts/${draftId}/preview`, editor, { method: "POST", body: "{}" })
+  assert.equal(preview.status, 409)
+  assert.equal((await accept(draftId)).status, 409)
+  // A snapshot pointing elsewhere is caught by inspect too, even with the stored row still good
+  const other = await adminKeyed("admin_key_snap")
+  const row = (await (await call(`/api/builder/drafts/${other}`, editor)).json()) as { id: string; state: Record<string, any> }
+  const source = { ...row.state.recipe.config.source, url: "https://evil.example.net/api" }
+  const snap = { ...row, state: { ...row.state, recipe: { ...row.state.recipe, config: { ...row.state.recipe.config, source } } } }
+  await assert.rejects(new BuilderService(pool, builderOptions).inspect(snap as any), (err: any) => err.status === 409)
+  assert.equal(await keyRows(other), 0)
+})
+
+test("admin_key_kept_same_origin", async () => {
+  const draftId = await adminKeyed("admin_key_same")
+  await withUrl(draftId, "https://data.example.org/v2/other")
+  assert.equal(await keyRows(draftId), 1)
+  const stored = await pool.query("SELECT client_state->'keyOrigins' AS o FROM app.agent_sessions WHERE id = $1", [draftId])
+  assert.deepEqual(stored.rows[0].o, { url: "https://data.example.org", layerUrl: null })
+})
+
 test("edit_is_refused_while_a_connector_update_is_pending_and_keeps_the_version", async () => {
   const first = await newDraft()
   await saveDraft(first, draftState("edit_ver", "sheet_link", { url: "https://data.example.org/a.csv" }))

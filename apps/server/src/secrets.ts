@@ -169,7 +169,7 @@ export async function copySecret(
  * until its source is accepted, and they go with the draft.
  */
 export async function setDraftSecret(
-  pool: pg.Pool,
+  pool: Pick<pg.Pool, "query">,
   key: Buffer,
   sessionId: string,
   name: string,

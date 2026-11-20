@@ -121,6 +121,16 @@ test("accept_rejects_inspect_mode_recipe", async () => {
   assert.equal((await pool.query("SELECT 1 FROM app.integrations WHERE id = 'inspect_left'")).rows.length, 0)
 })
 
+test("accept_checks_the_source_link_again", async () => {
+  // The address was changed after the preview to one that reaches the local network
+  HOSTS["inside.example.org"] = ["10.0.0.5"]
+  const id = await newDraft()
+  await saveDraft(id, draftState("link_after_preview", "sheet_link", { url: "https://inside.example.org/a.csv" }))
+  const refused = await accept(id)
+  assert.equal(refused.status, 400)
+  assert.equal((await pool.query("SELECT 1 FROM app.integrations WHERE id = 'link_after_preview'")).rows.length, 0)
+})
+
 test("accept_refuses_taken_id", async () => {
   const first = await newDraft()
   await saveDraft(first, draftState("taken_one", "sheet_link", { url: "https://data.example.org/a.csv" }))
