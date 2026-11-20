@@ -368,6 +368,34 @@ test("apply_v2_keeps_deployment_fields", async () => {
   assert.equal(base.version, 2)
 })
 
+async function keyRows(id: string): Promise<number> {
+  return (await pool.query("SELECT 1 FROM app.integration_secrets WHERE integration_id = $1 AND name = 'api_key'", [id])).rows.length
+}
+
+test("update_to_new_origin_removes_key", async () => {
+  await installBuilt("built_key_move")
+  await proposeAndApprove("built_key_move")
+  await pool.query("INSERT INTO app.integration_secrets (integration_id, name, value) VALUES ('built_key_move', 'api_key', 'x')")
+  await approveNewVersion("built_key_move", "https://other.example.net/v2.csv")
+  const response = await post("/api/library/built_key_move/install", editor)
+  assert.equal(response.status, 200, await response.clone().text())
+  assert.equal(((await response.json()) as { keyRemoved?: boolean }).keyRemoved, true)
+  assert.equal((await installed("built_key_move")).recipe?.config.source.url, "https://other.example.net/v2.csv")
+  assert.equal(await keyRows("built_key_move"), 0)
+})
+
+test("update_same_origin_keeps_key", async () => {
+  await installBuilt("built_key_stay")
+  await proposeAndApprove("built_key_stay")
+  await pool.query("INSERT INTO app.integration_secrets (integration_id, name, value) VALUES ('built_key_stay', 'api_key', 'x')")
+  await approveNewVersion("built_key_stay", "https://data.example.org:443/other/v2.csv")
+  const response = await post("/api/library/built_key_stay/install", editor)
+  assert.equal(response.status, 200, await response.clone().text())
+  assert.equal(((await response.json()) as { keyRemoved?: boolean }).keyRemoved, undefined)
+  assert.equal((await installed("built_key_stay")).recipe?.config.source.url, "https://data.example.org:443/other/v2.csv")
+  assert.equal(await keyRows("built_key_stay"), 1)
+})
+
 test("local_edit_still_changed_here", async () => {
   await installBuilt("built_local")
   await proposeAndApprove("built_local")

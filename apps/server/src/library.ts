@@ -28,6 +28,8 @@ import { AuthUser } from "./auth.js"
 import { canonicalDefinition, installIntegration, ID_PATTERN } from "./install.js"
 import { keepValidSettingValues } from "./integrationSettings.js"
 import { ConnectorInfo, CONNECTORS, connectorCode } from "./builder/connectors.js"
+import { addressOriginChanged } from "./builder/origins.js"
+import { deleteSecret } from "./secrets.js"
 import { buildDefinition, PLACES_INPUT, validateRecipe } from "./builder/buildDefinition.js"
 
 /** The connector registry update detection reads; tests pass one with a bumped version. */
@@ -371,7 +373,7 @@ export async function installLibraryEntry(
   id: string,
   createdBy: string | null,
   connectors: ConnectorRegistry = CONNECTORS
-): Promise<{ version: number } | null> {
+): Promise<{ version: number; keyRemoved?: boolean } | null> {
   const shipped = await loadLibraryEntry(libraryPath, id)
   const built = shipped ? null : await loadBuiltEntryVersion(pool, libraryPath, id, connectors)
   const entry = shipped ?? built?.definition
@@ -397,8 +399,17 @@ export async function installLibraryEntry(
     if (Object.keys(kept).length > 0) definition.settingValues = kept
     else delete definition.settingValues
   }
-  const result = await installIntegration(pool, definition as unknown as IntegrationDefinition, "ready", createdBy)
+  const result: { version: number; keyRemoved?: boolean } = await installIntegration(
+    pool, definition as unknown as IntegrationDefinition, "ready", createdBy
+  )
   if (built) await setBuiltBase(pool, id, built.version, entry)
+  // A newer version that moves the source to another origin must not receive the key stored for the old one
+  if (built && installed.rows[0]?.definition.recipe) {
+    const was = installed.rows[0].definition as IntegrationDefinition
+    if (addressOriginChanged(was.recipe?.config.source, entry.recipe?.config.source) && (await deleteSecret(pool, id, "api_key"))) {
+      result.keyRemoved = true
+    }
+  }
   return result
 }
 

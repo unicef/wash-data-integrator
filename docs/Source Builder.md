@@ -128,6 +128,7 @@ A source made here can be offered to the whole deployment:
    new version's settings and keeps the copy's schedule, area of interest,
    limits, setting values and key. A copy that was changed locally shows
    **Changed here** instead and keeps its own settings.
+   If an approved update changes the source's address, its key is removed and an admin must add it again.
 
 A library entry holds the recipe (the settings from the steps), never code, keys,
 the area of interest or the schedule. When an entry is installed or imported,

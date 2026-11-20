@@ -27,6 +27,7 @@ import { buildDefinition, PLACES_INPUT, validateRecipe } from "./buildDefinition
 import { CONNECTORS } from "./connectors.js"
 import type { ConnectorRegistry } from "../library.js"
 import { checkLink, Resolver } from "./linkSafety.js"
+import { ADDRESS_FIELDS, KeyOrigins, keyOriginsOf } from "./origins.js"
 import { suggestMatches } from "./places.js"
 
 /** Wall-clock limit of an inspect or preview run. */
@@ -84,29 +85,6 @@ export interface DraftState {
    * soon as an address points to another origin. Never set by clients.
    */
   keyOrigins?: KeyOrigins
-}
-
-/** The origin (scheme, host and port) of each source address a key was given for; null when unset. */
-export type KeyOrigins = Record<(typeof ADDRESS_FIELDS)[number], string | null>
-
-/** The source fields a connector sends requests to. */
-const ADDRESS_FIELDS = ["url", "layerUrl"] as const
-
-/** The origin of an address, null when empty; text that is not a URL is its own origin. */
-function originOf(value: unknown): string | null {
-  if (value === undefined || value === null || value === "") return null
-  try {
-    const url = new URL(String(value))
-    return url.origin === "null" ? `${url.protocol}//${url.host}` : url.origin
-  } catch {
-    return "invalid:" + String(value)
-  }
-}
-
-/** The origins of a source's addresses. */
-function keyOriginsOf(source: Record<string, unknown> | undefined): KeyOrigins {
-  const s = source ?? {}
-  return { url: originOf(s.url), layerUrl: originOf(s.layerUrl) }
 }
 
 /** One builder draft as its routes see it. */

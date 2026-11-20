@@ -1293,7 +1293,7 @@ async function route(
     if (body.runNow === true && runs) {
       runId = await runs.start(libraryInstallMatch[1]).catch(() => null)
     }
-    json(res, 200, { version: result.version, runId })
+    json(res, 200, { version: result.version, runId, ...(result.keyRemoved ? { keyRemoved: true } : {}) })
     return
   }
 
