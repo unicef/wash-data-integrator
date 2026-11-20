@@ -396,6 +396,39 @@ test("update_same_origin_keeps_key", async () => {
   assert.equal(await keyRows("built_key_stay"), 1)
 })
 
+test("update_moving_url_to_layerUrl_removes_key", async () => {
+  await installBuilt("built_key_layer")
+  await proposeAndApprove("built_key_layer")
+  await pool.query("INSERT INTO app.integration_secrets (integration_id, name, value) VALUES ('built_key_layer', 'api_key', 'x')")
+  const row = (await pool.query("SELECT definition FROM app.built_library_entries WHERE id = 'built_key_layer'")).rows[0]
+  const next = structuredClone(row.definition)
+  next.recipe.config.source = { url: "https://data.example.org/cases.csv", layerUrl: "https://other.example.net/layer" }
+  await pool.query("UPDATE app.built_library_entries SET pending_definition = $1 WHERE id = 'built_key_layer'", [JSON.stringify(next)])
+  assert.equal((await post("/api/library/built/built_key_layer/approve", admin)).status, 200)
+  const response = await post("/api/library/built_key_layer/install", editor)
+  assert.equal(response.status, 200, await response.clone().text())
+  assert.equal(((await response.json()) as { keyRemoved?: boolean }).keyRemoved, true)
+  assert.equal(await keyRows("built_key_layer"), 0)
+})
+
+test("key_deleted_before_new_definition_is_installed", async () => {
+  await installBuilt("built_key_fail")
+  await proposeAndApprove("built_key_fail")
+  await pool.query("INSERT INTO app.integration_secrets (integration_id, name, value) VALUES ('built_key_fail', 'api_key', 'x')")
+  await approveNewVersion("built_key_fail", "https://other.example.net/v2.csv")
+  // Make the install fail after the origin check: a trigger rejects writes of the integration row
+  await pool.query(`CREATE FUNCTION app.refuse_key_fail() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'forced failure'; END $$`)
+  await pool.query(`CREATE TRIGGER refuse_key_fail BEFORE UPDATE ON app.integrations FOR EACH ROW WHEN (OLD.id = 'built_key_fail') EXECUTE FUNCTION app.refuse_key_fail()`)
+  try {
+    await assert.rejects(installLibraryEntry(pool, libraryPath, "built_key_fail", editorId))
+  } finally {
+    await pool.query("DROP TRIGGER refuse_key_fail ON app.integrations")
+    await pool.query("DROP FUNCTION app.refuse_key_fail()")
+  }
+  assert.equal(await keyRows("built_key_fail"), 0)
+  assert.equal((await installed("built_key_fail")).recipe?.config.source.url, "https://data.example.org/cases.csv")
+})
+
 test("local_edit_still_changed_here", async () => {
   await installBuilt("built_local")
   await proposeAndApprove("built_local")

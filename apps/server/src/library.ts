@@ -399,17 +399,21 @@ export async function installLibraryEntry(
     if (Object.keys(kept).length > 0) definition.settingValues = kept
     else delete definition.settingValues
   }
+  // A newer version that moves the source to another origin must not receive the key stored for the old one.
+  // The key goes first: if the install then fails, a missing key is the safe outcome (the source waits for an admin to add it).
+  let keyRemoved = false
+  if (built && installed.rows[0]?.definition.recipe) {
+    const was = installed.rows[0].definition as IntegrationDefinition
+    if (addressOriginChanged(was.recipe?.config.source, entry.recipe?.config.source)) {
+      keyRemoved = await deleteSecret(pool, id, "api_key")
+      if (keyRemoved) console.warn(`library: removed the api_key of ${id} before installing a version with a new source address`)
+    }
+  }
   const result: { version: number; keyRemoved?: boolean } = await installIntegration(
     pool, definition as unknown as IntegrationDefinition, "ready", createdBy
   )
   if (built) await setBuiltBase(pool, id, built.version, entry)
-  // A newer version that moves the source to another origin must not receive the key stored for the old one
-  if (built && installed.rows[0]?.definition.recipe) {
-    const was = installed.rows[0].definition as IntegrationDefinition
-    if (addressOriginChanged(was.recipe?.config.source, entry.recipe?.config.source) && (await deleteSecret(pool, id, "api_key"))) {
-      result.keyRemoved = true
-    }
-  }
+  if (keyRemoved) result.keyRemoved = true
   return result
 }
 
