@@ -1144,7 +1144,7 @@ async function route(
     const [, entryId, decision] = builtDecisionMatch
     try {
       if (decision === "approve") {
-        json(res, 200, { id: entryId, status: "approved", ...(await approveBuiltEntry(pool, entryId, user.id)) })
+        json(res, 200, { id: entryId, status: "approved", ...(await approveBuiltEntry(pool, entryId, user.id, libraryPath)) })
       } else {
         const note = typeof body.note === "string" && body.note.trim() !== "" ? body.note.trim() : null
         await rejectBuiltEntry(pool, entryId, note)

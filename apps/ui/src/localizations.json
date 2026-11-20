@@ -9514,12 +9514,12 @@
     },
     {
       "_base": "en",
-      "en": "The installed copy differs from the approved entry",
-      "fr": "The installed copy differs from the approved entry",
-      "pt": "The installed copy differs from the approved entry",
-      "es": "The installed copy differs from the approved entry",
-      "mg": "The installed copy differs from the approved entry",
-      "sw": "The installed copy differs from the approved entry"
+      "en": "The installed copy was changed here since it was installed",
+      "fr": "The installed copy was changed here since it was installed",
+      "pt": "The installed copy was changed here since it was installed",
+      "es": "The installed copy was changed here since it was installed",
+      "mg": "The installed copy was changed here since it was installed",
+      "sw": "The installed copy was changed here since it was installed"
     },
     {
       "_base": "en",

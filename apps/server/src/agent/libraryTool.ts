@@ -76,7 +76,14 @@ export async function searchLibrary(
   const wanted = terms(query)
   const scored: { entry: (typeof entries)[number]; definition: IntegrationDefinition; score: number }[] = []
   for (const entry of entries) {
-    const definition = await loadAnyLibraryEntry(pool, libraryPath, entry.id)
+    // One invalid built entry must not break the search: it is skipped with a warning
+    let definition: IntegrationDefinition | null
+    try {
+      definition = await loadAnyLibraryEntry(pool, libraryPath, entry.id)
+    } catch (err) {
+      console.warn(`library search: skipping entry ${entry.id}: ${err instanceof Error ? err.message : String(err)}`)
+      continue
+    }
     if (!definition) continue
     const haystack = [
       entry.id,

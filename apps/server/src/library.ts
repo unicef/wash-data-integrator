@@ -8,21 +8,27 @@
  * updates; the same fields are excluded from update detection.
  *
  * Built entries (app.built_library_entries) are builder-made sources an
- * editor proposed and an admin approved. They are stored without code: an
- * install inlines the connector's current code. An installed builder source
- * has an update when its connector version is behind the registry, and
- * applying it keeps the source's settings (recipe.config) as they are.
+ * editor proposed and an admin approved. They are stored without code; an
+ * install rebuilds the definition from the entry's recipe (buildDefinition)
+ * and inlines the connector's current code, so only the name, description
+ * and source information are taken from the stored entry. An installed copy
+ * remembers the entry version it came from (app.integrations.built_base). It
+ * has an update when its connector version is behind the registry, or when a
+ * newer approved version differs and the copy has no local changes; applying
+ * the first keeps the copy's recipe, applying the second installs the new
+ * recipe. Deployment fields and secrets stay as installed in both.
  */
 
+import { createHash } from "node:crypto"
 import { access, readdir, readFile } from "node:fs/promises"
 import path from "node:path"
 import pg from "pg"
-import { ConnectorId, LocalizedString, IntegrationDefinition, Recipe, SettingValue } from "@data-integrator/definitions"
+import { ConnectorId, LocalizedString, IntegrationDefinition, Recipe, SettingValue, SourceInfo } from "@data-integrator/definitions"
 import { AuthUser } from "./auth.js"
 import { canonicalDefinition, installIntegration, ID_PATTERN } from "./install.js"
 import { keepValidSettingValues } from "./integrationSettings.js"
 import { ConnectorInfo, CONNECTORS, connectorCode } from "./builder/connectors.js"
-import { validateRecipe } from "./builder/buildDefinition.js"
+import { buildDefinition, PLACES_INPUT, validateRecipe } from "./builder/buildDefinition.js"
 
 /** The connector registry update detection reads; tests pass one with a bumped version. */
 export type ConnectorRegistry = Record<ConnectorId, ConnectorInfo>
@@ -56,7 +62,7 @@ export interface LibraryEntry {
   builtStatus?: "proposed" | "approved" | "rejected"
   /** Built entries: the connector the entry uses */
   connector?: string
-  /** Built entries: the installed copy differs from the approved entry */
+  /** Built entries: the installed copy was changed here since it was installed from the library */
   changedHere?: boolean
   /** Built entries, admins only: a new version waits for approval */
   pendingVersion?: boolean
@@ -111,12 +117,88 @@ async function withCurrentConnector(
   }
 }
 
+/** Fingerprint of a builder source's definition as builtComparableJson sees it. */
+function builtFingerprint(definition: IntegrationDefinition): string {
+  return createHash("sha256").update(builtComparableJson(definition)).digest("hex")
+}
+
+/** What an installed copy of a built entry remembers of the entry it came from. */
+interface BuiltBase {
+  version: number
+  fingerprint: string
+}
+
+/**
+ * A built entry's definition rebuilt from its recipe: destinations, inputs,
+ * files, secrets, runtime and trigger come from the recipe and the connector;
+ * only the id, name, description and source information come from the
+ * stored entry. Throws a 400 LibraryError when the recipe cannot be built.
+ */
+async function rebuildBuiltDefinition(stored: Record<string, unknown>, libraryPath: string): Promise<IntegrationDefinition> {
+  const id = stored.id as string
+  const recipe = stored.recipe as Recipe
+  const name = isLocalized(stored.name) ? stored.name : { _base: "en", en: id }
+  const source = typeof stored.source === "object" && stored.source !== null && !Array.isArray(stored.source)
+    ? (stored.source as SourceInfo)
+    : { name }
+  const places = recipe?.config?.places
+  let definition: IntegrationDefinition
+  try {
+    definition = await buildDefinition(
+      {
+        id,
+        name,
+        source,
+        trigger: {},
+        recipe,
+        ...(places ? { places: { inputId: PLACES_INPUT, tableId: places.table } } : {})
+      },
+      libraryPath
+    )
+  } catch (err) {
+    throw new LibraryError(400, err instanceof Error ? err.message : String(err))
+  }
+  if (isLocalized(stored.description)) definition.description = stored.description
+  return definition
+}
+
+/** Whether a value is a LocalizedString. */
+function isLocalized(value: unknown): value is LocalizedString {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false
+  const base = (value as Record<string, unknown>)._base
+  return typeof base === "string" && typeof (value as Record<string, unknown>)[base] === "string"
+}
+
+/**
+ * How an installed builder source stands against its approved entry. Without
+ * a remembered base (a copy installed by the builder, not from the library)
+ * the copy counts as changed when it differs from the entry.
+ */
+function builtStanding(
+  current: IntegrationDefinition,
+  base: BuiltBase | null,
+  entry: IntegrationDefinition
+): { changedHere: boolean; entryNewer: boolean } {
+  const here = builtFingerprint(current)
+  const approved = builtFingerprint(entry)
+  if (!base || typeof base.fingerprint !== "string") return { changedHere: here !== approved, entryNewer: false }
+  const changedHere = here !== base.fingerprint
+  return { changedHere, entryNewer: !changedHere && approved !== base.fingerprint }
+}
+
+/** Records the built entry version an installed copy now matches. */
+async function setBuiltBase(pool: pg.Pool, id: string, version: number, definition: IntegrationDefinition): Promise<void> {
+  const base: BuiltBase = { version, fingerprint: builtFingerprint(definition) }
+  await pool.query("UPDATE app.integrations SET built_base = $2 WHERE id = $1", [id, JSON.stringify(base)])
+}
+
 /** One built entry row. */
 interface BuiltRow {
   id: string
   definition: IntegrationDefinition
   status: "proposed" | "approved" | "rejected"
   pending: boolean
+  version: number
 }
 
 /** Whether the shipped library has an entry directory of this id. */
@@ -135,14 +217,25 @@ export async function loadBuiltEntry(
   id: string,
   connectors: ConnectorRegistry = CONNECTORS
 ): Promise<IntegrationDefinition | null> {
+  return (await loadBuiltEntryVersion(pool, libraryPath, id, connectors))?.definition ?? null
+}
+
+/** loadBuiltEntry with the entry's version. */
+async function loadBuiltEntryVersion(
+  pool: pg.Pool,
+  libraryPath: string,
+  id: string,
+  connectors: ConnectorRegistry
+): Promise<{ definition: IntegrationDefinition; version: number } | null> {
   if (!ID_PATTERN.test(id)) return null
-  const row = await pool.query("SELECT definition FROM app.built_library_entries WHERE id = $1 AND status = 'approved'", [id])
+  const row = await pool.query("SELECT definition, version FROM app.built_library_entries WHERE id = $1 AND status = 'approved'", [id])
   if (row.rows.length === 0) return null
-  const definition = row.rows[0].definition as IntegrationDefinition
-  if (definition.id !== id || !definition.recipe) return null
-  assertValidRecipe(definition as unknown as Record<string, unknown>)
-  const trigger = connectors[definition.recipe.connector]?.needsWebhook ? { webhook: true } : {}
-  return withCurrentConnector({ ...definition, trigger }, libraryPath, connectors)
+  const stored = row.rows[0].definition as IntegrationDefinition
+  if (stored.id !== id || !stored.recipe) return null
+  assertValidRecipe(stored as unknown as Record<string, unknown>)
+  // Rebuilt from the recipe: stored destinations, inputs, files, secrets and runtime are never trusted
+  const rebuilt = await rebuildBuiltDefinition(stored as unknown as Record<string, unknown>, libraryPath)
+  return { definition: await withCurrentConnector(rebuilt, libraryPath, connectors), version: row.rows[0].version }
 }
 
 /** A shipped entry, or else an approved built one, with its code inlined; null when neither exists. */
@@ -195,9 +288,9 @@ export async function listLibrary(
   } catch {
     ids = []
   }
-  const installed = await pool.query("SELECT id, version, definition FROM app.integrations")
-  const byId = new Map<string, { version: number; definition: IntegrationDefinition }>(
-    installed.rows.map(row => [row.id, { version: row.version, definition: row.definition }])
+  const installed = await pool.query("SELECT id, version, definition, built_base FROM app.integrations")
+  const byId = new Map<string, { version: number; definition: IntegrationDefinition; base: BuiltBase | null }>(
+    installed.rows.map(row => [row.id, { version: row.version, definition: row.definition, base: row.built_base ?? null }])
   )
 
   const summary = (id: string, definition: IntegrationDefinition) => ({
@@ -233,7 +326,7 @@ export async function listLibrary(
 
   const isAdmin = options.role === "admin"
   const built = await pool.query(
-    `SELECT id, definition, status, pending_definition IS NOT NULL AS pending FROM app.built_library_entries
+    `SELECT id, definition, status, version, pending_definition IS NOT NULL AS pending FROM app.built_library_entries
      WHERE status = 'approved' OR (status = 'proposed' AND $1) ORDER BY id`,
     [isAdmin]
   )
@@ -244,14 +337,19 @@ export async function listLibrary(
     const recipe = current?.definition.recipe
     const info = connectors[row.definition.recipe.connector]
     const behind = !!recipe && !!info && recipe.connectorVersion < info.version
+    // Compared as an install would build it; a stored entry that no longer builds is compared as stored
+    const entry = await rebuildBuiltDefinition(row.definition as unknown as Record<string, unknown>, libraryPath).catch(
+      () => row.definition
+    )
+    const standing = current && recipe ? builtStanding(current.definition, current.base, entry) : null
     entries.push({
       ...summary(row.id, { ...row.definition, trigger: {} }),
-      status: !current ? "not_installed" : !recipe || behind ? "update_available" : "installed",
+      status: !current ? "not_installed" : !recipe || behind || standing?.entryNewer ? "update_available" : "installed",
       installedVersion: current?.version ?? null,
       origin: "built",
       connector: row.definition.recipe.connector,
       builtStatus: row.status,
-      ...(current ? { changedHere: builtComparableJson(current.definition) !== builtComparableJson(row.definition) } : {}),
+      ...(current ? { changedHere: standing ? standing.changedHere : true } : {}),
       ...(isAdmin && row.pending ? { pendingVersion: true } : {})
     })
   }
@@ -261,9 +359,11 @@ export async function listLibrary(
 /**
  * Installs or updates one entry, shipped or approved built. On update, the
  * deployment-owned fields keep their installed values (present, absent, or
- * explicit null alike). An installed builder source updates by its connector
- * alone: the connector's current code and version, everything else as
- * installed. Returns null when the entry does not exist.
+ * explicit null alike). An installed builder source with no local changes
+ * whose approved entry has a newer version takes that version's recipe;
+ * otherwise it updates by its connector alone (the connector's current code
+ * and version, everything else as installed). Returns null when the entry
+ * does not exist.
  */
 export async function installLibraryEntry(
   pool: pg.Pool,
@@ -273,12 +373,14 @@ export async function installLibraryEntry(
   connectors: ConnectorRegistry = CONNECTORS
 ): Promise<{ version: number } | null> {
   const shipped = await loadLibraryEntry(libraryPath, id)
-  const entry = shipped ?? (await loadBuiltEntry(pool, libraryPath, id, connectors))
+  const built = shipped ? null : await loadBuiltEntryVersion(pool, libraryPath, id, connectors)
+  const entry = shipped ?? built?.definition
   if (!entry || entry.id !== id) return null
-  const installed = await pool.query("SELECT definition FROM app.integrations WHERE id = $1", [id])
-  if (!shipped && installed.rows[0]?.definition.recipe) {
+  const installed = await pool.query("SELECT definition, built_base FROM app.integrations WHERE id = $1", [id])
+  if (built && installed.rows[0]?.definition.recipe) {
     const current = installed.rows[0].definition as IntegrationDefinition
-    return installIntegration(pool, await withCurrentConnector(current, libraryPath, connectors), "ready", createdBy)
+    const { entryNewer } = builtStanding(current, installed.rows[0].built_base ?? null, entry)
+    if (!entryNewer) return installIntegration(pool, await withCurrentConnector(current, libraryPath, connectors), "ready", createdBy)
   }
   const definition: Record<string, unknown> = { ...entry }
   if (installed.rows.length > 0) {
@@ -295,7 +397,9 @@ export async function installLibraryEntry(
     if (Object.keys(kept).length > 0) definition.settingValues = kept
     else delete definition.settingValues
   }
-  return installIntegration(pool, definition as unknown as IntegrationDefinition, "ready", createdBy)
+  const result = await installIntegration(pool, definition as unknown as IntegrationDefinition, "ready", createdBy)
+  if (built) await setBuiltBase(pool, id, built.version, entry)
+  return result
 }
 
 /**
@@ -397,7 +501,12 @@ async function nothingToDecide(pool: pg.Pool, id: string): Promise<never> {
 }
 
 /** Approves a proposed entry, or promotes an approved entry's pending version (bumping its version). */
-export async function approveBuiltEntry(pool: pg.Pool, id: string, adminId: string): Promise<{ version: number }> {
+export async function approveBuiltEntry(
+  pool: pg.Pool,
+  id: string,
+  adminId: string,
+  libraryPath: string | null = null
+): Promise<{ version: number }> {
   const waiting = await pool.query(
     "SELECT COALESCE(pending_definition, definition) AS definition FROM app.built_library_entries WHERE id = $1",
     [id]
@@ -417,7 +526,19 @@ export async function approveBuiltEntry(pool: pg.Pool, id: string, adminId: stri
     [id, adminId]
   )
   if (result.rows.length === 0) return nothingToDecide(pool, id)
-  return { version: result.rows[0].version }
+  const version = result.rows[0].version as number
+  // The proposer's own copy that matches what was approved now comes from this version
+  if (libraryPath) {
+    const copy = await pool.query("SELECT definition FROM app.integrations WHERE id = $1 AND definition ? 'recipe'", [id])
+    const approved = (await pool.query("SELECT definition FROM app.built_library_entries WHERE id = $1", [id])).rows[0]?.definition
+    if (copy.rows.length > 0 && approved) {
+      const entry = await rebuildBuiltDefinition(approved, libraryPath).catch(() => null)
+      if (entry && builtFingerprint(copy.rows[0].definition) === builtFingerprint(entry)) {
+        await setBuiltBase(pool, id, version, entry)
+      }
+    }
+  }
+  return { version }
 }
 
 /** Rejects a proposed entry, or drops an approved entry's pending version; the note says why. */
@@ -479,8 +600,10 @@ export async function importBuiltEntry(
   if (hand.rows.length > 0 && !hand.rows[0].built) {
     throw new LibraryError(400, `An integration "${id}" that was not made with the builder is already installed.`)
   }
+  // Rebuilt from the recipe: the file's destinations, inputs, files, secrets and runtime are ignored.
   // Deployment-owned fields (aoi, trigger, limits, setting values) never travel; the schedule is the importer's
-  for (const field of [...DEPLOYMENT_FIELDS, "code"]) delete definition[field]
-  const result = await upsertBuiltDefinition(pool, id, definition, adminId)
+  const rebuilt: Record<string, unknown> = { ...(await rebuildBuiltDefinition(definition, libraryPath)) }
+  for (const field of [...DEPLOYMENT_FIELDS, "code"]) delete rebuilt[field]
+  const result = await upsertBuiltDefinition(pool, id, rebuilt, adminId)
   return { id, status: result.rows[0].status, pending: result.rows[0].pending }
 }

@@ -429,7 +429,7 @@ export function Library({ user, installId }: LibraryProps) {
                     <span className={`chip ${entry.origin === "built" ? "chip-table" : ""}`}>{entry.origin === "built" ? T`Built here` : T`Shipped`}</span>
                     {entry.builtStatus === "proposed" && <span className="chip chip-paused">{T`Waiting for approval`}</span>}
                     {entry.pendingVersion && entry.builtStatus === "approved" && <span className="chip chip-paused">{T`New version waiting`}</span>}
-                    {entry.changedHere && <span className="chip chip-paused" title={T`The installed copy differs from the approved entry`}>{T`Changed here`}</span>}
+                    {entry.changedHere && <span className="chip chip-paused" title={T`The installed copy was changed here since it was installed`}>{T`Changed here`}</span>}
                     {entry.status !== "not_installed" && <span className={`chip ${entry.status === "installed" ? "chip-finished" : "chip-paused"}`}>{statusLabels()[entry.status]}</span>}
                     {entry.builtStatus === "proposed" ? null : canDesign && entry.status !== "installed" ? (
                       <button disabled={busy} aria-expanded={confirming === entry.id} aria-controls={confirming === entry.id ? `library-confirm-${entry.id}` : undefined} onClick={() => { setConfirming(confirming === entry.id ? null : entry.id); setInstalled(null) }}>

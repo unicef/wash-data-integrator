@@ -18,6 +18,7 @@ import { installLibraryEntry, LibraryEntry, listLibrary } from "../src/library.j
 import { buildDefinition } from "../src/builder/buildDefinition.js"
 import { CONNECTORS, connectorCode } from "../src/builder/connectors.js"
 import { idTaken } from "../src/builder/drafts.js"
+import { searchLibrary } from "../src/agent/libraryTool.js"
 import { startTestDb, TestDb } from "./helpers/pg.js"
 
 const MIGRATIONS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "migrations")
@@ -322,4 +323,125 @@ test("library_install_rejects_inspect_mode", async () => {
   assert.equal(response.status, 400)
   assert.match(((await response.json()) as { error: string }).error, /preview state/)
   assert.equal((await pool.query("SELECT 1 FROM app.integrations WHERE id = 'built_inspect'")).rows.length, 0)
+})
+
+/** Approves a new version of an approved entry whose source address is `url`, as if proposed from another copy. */
+async function approveNewVersion(id: string, url: string): Promise<void> {
+  const row = (await pool.query("SELECT definition FROM app.built_library_entries WHERE id = $1", [id])).rows[0]
+  const next = structuredClone(row.definition)
+  next.recipe.config.source = { url }
+  await pool.query("UPDATE app.built_library_entries SET pending_definition = $2 WHERE id = $1", [id, JSON.stringify(next)])
+  const approved = await post(`/api/library/built/${id}/approve`, admin)
+  assert.equal(approved.status, 200, await approved.clone().text())
+}
+
+test("approved_v2_shows_update_on_installed_v1", async () => {
+  await installBuilt("built_v2")
+  await proposeAndApprove("built_v2")
+  assert.equal((await entries(editor)).find(e => e.id === "built_v2")?.status, "installed")
+  await approveNewVersion("built_v2", "https://data.example.org/v2.csv")
+  const entry = (await entries(editor)).find(e => e.id === "built_v2")
+  assert.equal(entry?.status, "update_available")
+  assert.equal(entry?.changedHere, false)
+  // Listing never applies anything
+  assert.equal((await installed("built_v2")).recipe?.config.source.url, "https://data.example.org/cases.csv")
+})
+
+test("apply_v2_keeps_deployment_fields", async () => {
+  await installBuilt("built_apply")
+  await proposeAndApprove("built_apply")
+  // Deployment fields changed here are not local edits of the source
+  await installIntegration(pool, { ...(await installed("built_apply")), trigger: { cron: "0 9 * * 1" }, limits: { timeoutMs: 60000 } }, "ready", editorId)
+  await approveNewVersion("built_apply", "https://data.example.org/v2.csv")
+  assert.equal((await entries(editor)).find(e => e.id === "built_apply")?.status, "update_available")
+  const response = await post("/api/library/built_apply/install", editor)
+  assert.equal(response.status, 200, await response.clone().text())
+  const after = await installed("built_apply")
+  assert.equal(after.recipe?.config.source.url, "https://data.example.org/v2.csv")
+  assert.deepEqual(after.trigger, { cron: "0 9 * * 1" })
+  assert.deepEqual(after.limits, { timeoutMs: 60000 })
+  assert.equal(after.code, await connectorCode("sheet_link", libraryPath))
+  const entry = (await entries(editor)).find(e => e.id === "built_apply")
+  assert.equal(entry?.status, "installed")
+  assert.equal(entry?.changedHere, false)
+  const base = (await pool.query("SELECT built_base FROM app.integrations WHERE id = 'built_apply'")).rows[0].built_base
+  assert.equal(base.version, 2)
+})
+
+test("local_edit_still_changed_here", async () => {
+  await installBuilt("built_local")
+  await proposeAndApprove("built_local")
+  const current = await installed("built_local")
+  await installIntegration(pool, {
+    ...current,
+    recipe: { ...current.recipe!, config: { ...current.recipe!.config, source: { url: "https://data.example.org/mine.csv" } } }
+  }, "ready", editorId)
+  await approveNewVersion("built_local", "https://data.example.org/v2.csv")
+  const entry = (await entries(editor)).find(e => e.id === "built_local")
+  assert.equal(entry?.status, "installed")
+  assert.equal(entry?.changedHere, true)
+  // Installing over it keeps the local recipe (a connector-only update)
+  await installLibraryEntry(pool, libraryPath, "built_local", editorId)
+  assert.equal((await installed("built_local")).recipe?.config.source.url, "https://data.example.org/mine.csv")
+})
+
+/** A definition whose recipe is sound but whose other fields were tampered with. */
+async function tampered(id: string): Promise<Record<string, unknown>> {
+  const good = await buildDefinition(
+    { id, name: { _base: "en", en: `Cases ${id}` }, source: { name: { _base: "en", en: "MoH" } }, trigger: {}, recipe: recipe() },
+    libraryPath
+  )
+  const { code: _code, trigger: _trigger, ...rest } = good
+  void _code
+  void _trigger
+  return {
+    ...rest,
+    description: { _base: "en", en: "Weekly cases" },
+    runtime: "node",
+    destinations: [{ kind: "table", tableId: "app_users_copy", action: "replace", columns: [{ id: "evil", type: "text" }] }],
+    inputs: { stolen: { kind: "table", tableId: "other_table", format: "csv" } },
+    secrets: ["other_key"],
+    files: { data: { accept: [".csv"] } }
+  }
+}
+
+function assertRebuilt(definition: Record<string, any>, id: string): void {
+  assert.equal(definition.runtime, "python")
+  assert.equal(definition.destinations.length, 1)
+  assert.equal(definition.destinations[0].tableId, id)
+  assert.deepEqual(definition.destinations[0].columns.map((c: any) => c.id), ["region", "cases"])
+  assert.equal(definition.inputs, undefined)
+  assert.equal(definition.secrets, undefined)
+  assert.equal(definition.files, undefined)
+  assert.deepEqual(definition.description, { _base: "en", en: "Weekly cases" })
+}
+
+test("import_with_mismatched_destination_is_rebuilt", async () => {
+  const response = await post("/api/library/built/import", admin, {
+    format: "wash-di-library-entry", version: 1, definition: await tampered("built_imp_tamper")
+  })
+  assert.equal(response.status, 200, await response.clone().text())
+  const row = (await pool.query("SELECT definition FROM app.built_library_entries WHERE id = 'built_imp_tamper'")).rows[0]
+  assertRebuilt(row.definition, "built_imp_tamper")
+  assert.equal("code" in row.definition, false)
+})
+
+test("install_rebuilds_from_recipe", async () => {
+  await pool.query(
+    `INSERT INTO app.built_library_entries (id, definition, status, proposed_by, proposed_at, approved_by, decided_at)
+     VALUES ($1, $2, 'approved', $3, now(), $3, now())`,
+    ["built_tamper", JSON.stringify(await tampered("built_tamper")), adminId]
+  )
+  await installLibraryEntry(pool, libraryPath, "built_tamper", editorId)
+  const definition = await installed("built_tamper")
+  assertRebuilt(definition as unknown as Record<string, any>, "built_tamper")
+  assert.equal(definition.code, await connectorCode("sheet_link", libraryPath))
+  assert.equal((await entries(editor)).find(e => e.id === "built_tamper")?.changedHere, false)
+})
+
+test("library_search_skips_invalid_built_entries", async () => {
+  // built_inspect (an approved entry with an inspect-mode recipe) cannot be loaded
+  const text = await searchLibrary(pool, libraryPath, "cases")
+  assert.ok(!text.includes("built_inspect"), text)
+  assert.ok(text.includes("built_share"), text)
 })
