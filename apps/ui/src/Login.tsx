@@ -60,7 +60,7 @@ export function Login({ onLogin }: LoginProps) {
   return (
     <main className="login-page">
       <form className="login-card" onSubmit={onSubmit}>
-        <h1>mWater Data Integrator</h1>
+        <h1>WASH Data Integrator</h1>
         {expired ? (
           <>
             <p>{T`Your password has expired. Choose a new one to sign in.`}</p>

@@ -21,10 +21,10 @@
   "author": "mWater (https://www.mwater.co)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mWater/data-integrator.git"
+    "url": "git+https://github.com/unicef/wash-data-integrator.git"
   },
-  "homepage": "https://github.com/mWater/data-integrator#readme",
+  "homepage": "https://github.com/unicef/wash-data-integrator#readme",
   "bugs": {
-    "url": "https://github.com/mWater/data-integrator/issues"
+    "url": "https://github.com/unicef/wash-data-integrator/issues"
   }
 }

@@ -1,4 +1,11 @@
-# mWater Data Integrator
+# WASH Data Integrator
+
+WASH Data Integrator is a fork of the mWater Data Integrator, maintained for the
+UNICEF WASH Innovation Hub. This fork adds a no-code source builder, so that
+new data sources can be added without writing integration code, alongside
+additions to the integration library.
+
+## About
 
 Open-source, self-hosted platform that ingests water and climate data
 (satellite rasters, gridded forecasts, sensor feeds, national databases,
@@ -8,8 +15,8 @@ API, a STAC catalog, SQL, dashboards, and Explore, an optional AI assistant
 for plain-language questions. An AI designer builds and tests the ingestion
 pipelines; pipeline code runs in sandboxed containers (podman + gVisor).
 
-Developed by [mWater](https://www.mwater.co) for the UNICEF WASH Innovation
-Hub, with initial deployments in Angola and Madagascar. It is the reference
+Originally developed by mWater for the UNICEF WASH Innovation Hub, with
+initial deployments in Angola and Madagascar. It is the reference
 implementation of the vendor-neutral architecture in
 [docs/spec/](docs/spec/).
 
@@ -112,3 +119,10 @@ requests are handled. Report vulnerabilities privately per
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+## Credits
+
+WASH Data Integrator is based on the mWater Data Integrator by mWater, released
+under the Apache License 2.0. The upstream project is at
+https://github.com/mWater/data-integrator. This fork keeps the original
+license and notices; see LICENSE and NOTICE.

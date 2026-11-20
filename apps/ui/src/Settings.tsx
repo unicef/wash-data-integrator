@@ -24,7 +24,7 @@ import { SettingsRow } from "./SettingsRow.js"
 import { AiSettingsSection } from "./AiSettingsSection.js"
 
 /** Shown as the home page title when the deployment has not set one. */
-const DEFAULT_SITE_TITLE = "mWater Data Integrator"
+const DEFAULT_SITE_TITLE = "WASH Data Integrator"
 
 /**
  * The deployment's display name, shown as the home page heading. Blank restores
