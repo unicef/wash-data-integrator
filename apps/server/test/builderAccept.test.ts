@@ -112,6 +112,15 @@ test("accept_installs_and_queues_first_run", async () => {
   assert.equal((await accept(id)).status, 409)
 })
 
+test("accept_rejects_inspect_mode_recipe", async () => {
+  const id = await newDraft()
+  await saveDraft(id, draftState("inspect_left", "sheet_link", { url: "https://data.example.org/a.csv" }, { mode: "inspect", columns: [] }))
+  const refused = await accept(id)
+  assert.equal(refused.status, 400)
+  assert.match(((await refused.json()) as { error: string }).error, /preview state/)
+  assert.equal((await pool.query("SELECT 1 FROM app.integrations WHERE id = 'inspect_left'")).rows.length, 0)
+})
+
 test("accept_refuses_taken_id", async () => {
   const first = await newDraft()
   await saveDraft(first, draftState("taken_one", "sheet_link", { url: "https://data.example.org/a.csv" }))

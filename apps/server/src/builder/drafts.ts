@@ -406,7 +406,7 @@ export class BuilderService {
     if (!id) throw new BuilderError(400, "Give the source an id before reading it.")
     if (!recipe) throw new BuilderError(400, "Choose a connector before reading the source.")
     try {
-      validateRecipe(recipe, mode === "inspect")
+      validateRecipe(recipe, mode)
     } catch (err) {
       throw new BuilderError(400, err instanceof Error ? err.message : String(err))
     }
@@ -439,6 +439,7 @@ export class BuilderService {
           source: draft.state.source ?? { name },
           trigger: draft.state.trigger ?? {},
           recipe: { ...recipe, config: { ...recipe.config, mode } },
+          run: mode,
           ...(places ? { places: { inputId: PLACES_INPUT, tableId: places.table } } : {})
         },
         this.options.libraryPath

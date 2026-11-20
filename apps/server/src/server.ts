@@ -1247,7 +1247,14 @@ async function route(
   // One entry in full (code elided): what the Library page shows when a row expands
   const libraryEntryMatch = pathname.match(/^\/api\/library\/([a-z][a-z0-9_]*)$/)
   if (libraryEntryMatch && req.method === "GET") {
-    const definition = libraryPath ? await loadAnyLibraryEntry(pool, libraryPath, libraryEntryMatch[1]) : null
+    let definition: IntegrationDefinition | null = null
+    try {
+      definition = libraryPath ? await loadAnyLibraryEntry(pool, libraryPath, libraryEntryMatch[1]) : null
+    } catch (err) {
+      if (!(err instanceof LibraryError)) throw err
+      json(res, err.status, { error: err.message })
+      return
+    }
     if (!definition) {
       json(res, 404, { error: "unknown library entry" })
       return
@@ -1269,7 +1276,14 @@ async function route(
       return
     }
     const body = await readJsonBody(req)
-    const result = await installLibraryEntry(pool, libraryPath, libraryInstallMatch[1], user.id)
+    let result: Awaited<ReturnType<typeof installLibraryEntry>>
+    try {
+      result = await installLibraryEntry(pool, libraryPath, libraryInstallMatch[1], user.id)
+    } catch (err) {
+      if (!(err instanceof LibraryError)) throw err
+      json(res, err.status, { error: err.message })
+      return
+    }
     if (!result) {
       json(res, 404, { error: "unknown library entry" })
       return

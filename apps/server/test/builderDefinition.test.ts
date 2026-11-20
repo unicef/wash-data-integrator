@@ -91,11 +91,13 @@ test("merge_key_may_be_unpivot_date_column", async () => {
 
 test("inspect_with_no_columns", async () => {
   const r = recipe({ columns: [], mode: "inspect" })
-  const def = await buildDefinition(input(r), LIBRARY)
+  const def = await buildDefinition(input(r, { run: "inspect" }), LIBRARY)
   assert.equal(def.recipe?.config.mode, "inspect")
   try { validateDefinition(def) } catch (e) { assert.fail(`inspect definition should validate: ${e}`) }
   await assert.rejects(buildDefinition(input(recipe({ columns: [] })), LIBRARY), /at least one column/)
-  await assert.rejects(buildDefinition(input(recipe({ columns: [], mode: "preview" })), LIBRARY), /at least one column/)
+  await assert.rejects(buildDefinition(input(recipe({ columns: [], mode: "preview" }), { run: "preview" }), LIBRARY), /at least one column/)
+  // Without an explicit run, a stored mode is refused whatever the columns
+  await assert.rejects(buildDefinition(input(r), LIBRARY), /preview state/)
 })
 
 test("upload_declares_file_slot", async () => {

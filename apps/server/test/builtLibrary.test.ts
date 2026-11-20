@@ -309,3 +309,17 @@ test("id_clash_with_shipped_entry_refused", async () => {
   assert.equal((await post("/api/library/built/built_taken/reject", admin)).status, 200)
   assert.equal(await idTaken(pool, libraryPath, "built_taken"), false)
 })
+
+test("library_install_rejects_inspect_mode", async () => {
+  const bad = { id: "built_inspect", name: { _base: "en", en: "Bad" }, runtime: "python", destinations: [], contract: 2,
+    recipe: { ...recipe(), config: { ...recipe().config, columns: [], mode: "inspect" } } }
+  await pool.query(
+    `INSERT INTO app.built_library_entries (id, definition, status, proposed_by, proposed_at, approved_by, decided_at)
+     VALUES ($1, $2, 'approved', $3, now(), $3, now())`,
+    ["built_inspect", JSON.stringify(bad), adminId]
+  )
+  const response = await post("/api/library/built_inspect/install", editor)
+  assert.equal(response.status, 400)
+  assert.match(((await response.json()) as { error: string }).error, /preview state/)
+  assert.equal((await pool.query("SELECT 1 FROM app.integrations WHERE id = 'built_inspect'")).rows.length, 0)
+})

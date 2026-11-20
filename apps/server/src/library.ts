@@ -138,6 +138,7 @@ export async function loadBuiltEntry(
   if (row.rows.length === 0) return null
   const definition = row.rows[0].definition as IntegrationDefinition
   if (definition.id !== id || !definition.recipe) return null
+  assertValidRecipe(definition as unknown as Record<string, unknown>)
   const trigger = connectors[definition.recipe.connector]?.needsWebhook ? { webhook: true } : {}
   return withCurrentConnector({ ...definition, trigger }, libraryPath, connectors)
 }

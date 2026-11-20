@@ -8,7 +8,8 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "obj
 const hasText = (v: unknown) => typeof v === "string" && v.trim() !== ""
 
 /** Throws a user-readable Error when the recipe cannot be built or run. */
-export function validateRecipe(recipe: Recipe, inspect = recipe?.config?.mode === "inspect"): void {
+export function validateRecipe(recipe: Recipe, run?: "inspect" | "preview"): void {
+  const inspect = run === "inspect"
   const info = CONNECTORS[recipe?.connector]
   if (!info) throw new Error(`Unknown connector "${recipe?.connector}".`)
   if (!Number.isInteger(recipe.connectorVersion) || recipe.connectorVersion < 1) {
@@ -16,6 +17,9 @@ export function validateRecipe(recipe: Recipe, inspect = recipe?.config?.mode ==
   }
   const c = recipe.config
   if (!isObject(c)) throw new Error("The recipe has no settings.")
+  if (!run && c.mode !== undefined) {
+    throw new Error("This source was saved in a preview state; open it in the builder and accept again.")
+  }
   if (!isObject(c.source)) throw new Error("The source settings are missing.")
   if (!Array.isArray(c.columns) || (c.columns.length === 0 && !inspect)) throw new Error("Choose at least one column.")
   for (const col of c.columns) {
@@ -86,12 +90,14 @@ export interface BuildInput {
   trigger: Trigger
   recipe: Recipe
   places?: { inputId: string; tableId: string }
+  /** Set only by builder draft runs (inspect or preview); the recipe's config.mode is then expected */
+  run?: "inspect" | "preview"
 }
 
 /** Turns builder input into a full definition: destination schema, files, secrets, trigger and the connector's code. */
 export async function buildDefinition(input: BuildInput, libraryPath: string): Promise<IntegrationDefinition> {
   if (!ID_PATTERN.test(input.id)) throw new Error(`The id "${input.id}" is not valid: use lowercase letters, digits and underscores, starting with a letter.`)
-  validateRecipe(input.recipe)
+  validateRecipe(input.recipe, input.run)
   const { connector, config } = input.recipe
   const info = CONNECTORS[connector]
 
@@ -108,7 +114,7 @@ export async function buildDefinition(input: BuildInput, libraryPath: string): P
   const ids = columns.map((c) => c.id)
   if (new Set(ids).size !== ids.length) throw new Error("Column ids must be unique, including the generated place code and unpivot columns.")
 
-  if (config.writeMode === "merge" && config.mode !== "inspect" && !ids.includes(config.mergeKey as string)) {
+  if (config.writeMode === "merge" && input.run !== "inspect" && !ids.includes(config.mergeKey as string)) {
     throw new Error(`The merge key "${config.mergeKey}" is not a column of the saved table (the unpivoted columns are replaced by the date and value columns). Choose another key.`)
   }
 
