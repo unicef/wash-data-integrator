@@ -27,7 +27,7 @@
     "ez-localize": "^2.15.2",
     "pg": "^8.13.0",
     "tailwindcss": "^4.3.3",
-    "zod": "^4.4.3"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
