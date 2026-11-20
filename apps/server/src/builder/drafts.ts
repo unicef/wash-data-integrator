@@ -8,7 +8,7 @@
  */
 
 import { IncomingMessage, ServerResponse } from "node:http"
-import { readFile } from "node:fs/promises"
+import { access, readFile } from "node:fs/promises"
 import path from "node:path"
 import pg from "pg"
 import { IntegrationDefinition, LocalizedString, Recipe, SourceInfo, Trigger } from "@data-integrator/definitions"
@@ -16,11 +16,13 @@ import { AuthUser } from "../auth.js"
 import { executeRun, ExecutorDeps } from "../executor.js"
 import { FileApiOptions, handleSessionUpload } from "../filesApi.js"
 import { json, readJsonBody } from "../http.js"
-import { ID_PATTERN } from "../install.js"
+import { deleteIntegration, ID_PATTERN, installIntegration } from "../install.js"
+import { adoptSessionFiles } from "../files.js"
+import { getWebhookToken } from "../webhooks.js"
 import { queryRows } from "../queryApi.js"
 import { RasterStore } from "../rasterStore.js"
 import { cleanupScratch, draftSchema } from "../scratch.js"
-import { getDraftSecrets, listDraftSecrets, loadSecretKey, MissingSecretError, setDraftSecret } from "../secrets.js"
+import { getDraftSecrets, listDraftSecrets, loadSecretKey, MissingSecretError, setDraftSecret, setSecret } from "../secrets.js"
 import { buildDefinition, validateRecipe } from "./buildDefinition.js"
 import { checkLink, Resolver } from "./linkSafety.js"
 import { suggestMatches } from "./places.js"
@@ -41,6 +43,25 @@ const TYPE_ERROR_LIMIT = 50
 const KEY_NAME = "api_key"
 /** The input id a places table is declared under (the connectors read it by this name). */
 const PLACES_INPUT = "places"
+
+/** What accepting a draft returns. */
+export interface AcceptResult {
+  integrationId: string
+  /** Capability path senders post to (webhook sources only) */
+  webhookUrl?: string
+  /** The queued first run; absent for webhook sources and when queueing failed */
+  runId?: string
+}
+
+/**
+ * Whether an integration id is already used: an installed integration or a
+ * shipped library entry. Built library entries join here.
+ */
+export async function idTaken(pool: pg.Pool, libraryPath: string, id: string): Promise<boolean> {
+  const installed = await pool.query("SELECT 1 FROM app.integrations WHERE id = $1", [id])
+  if (installed.rows.length > 0) return true
+  return access(path.join(libraryPath, "integrations", id)).then(() => true, () => false)
+}
 
 /** The builder screens as saved on the draft. */
 export interface DraftState {
@@ -217,6 +238,128 @@ export class BuilderService {
   /** The draft's secret names and update times, never values. */
   async listKeys(draft: Draft): Promise<{ name: string; updatedAt: string }[]> {
     return listDraftSecrets(this.pool, draft.id)
+  }
+
+  /**
+   * Installs the draft's source, moves its upload and key to the new
+   * integration, queues the first run (not for webhook sources, which return
+   * their URL), and finishes the draft. A failure after the install removes
+   * the integration again and leaves the draft as it was.
+   */
+  async accept(draft: Draft, userId: string): Promise<AcceptResult> {
+    const { id, recipe } = draft.state
+    if (!id) throw new BuilderError(400, "Give the source an id before accepting it.")
+    if (!recipe) throw new BuilderError(400, "Choose a connector before accepting the source.")
+    const lock = await this.pool.connect()
+    try {
+      // One accept per draft at a time, and one per id across drafts
+      await lock.query("SELECT pg_advisory_lock(hashtext($1))", [`builder-accept:${id}`])
+      return await this.acceptLocked(draft, id, recipe, userId)
+    } finally {
+      await lock.query("SELECT pg_advisory_unlock(hashtext($1))", [`builder-accept:${id}`]).catch(() => {})
+      lock.release()
+    }
+  }
+
+  /** accept, holding the id's lock. */
+  private async acceptLocked(draft: Draft, id: string, recipe: Recipe, userId: string): Promise<AcceptResult> {
+    const status = await this.pool.query("SELECT status FROM app.agent_sessions WHERE id = $1", [draft.id])
+    if (status.rows[0]?.status === "finished") throw new BuilderError(409, "This draft was already accepted.")
+    try {
+      validateRecipe(recipe)
+    } catch (err) {
+      throw new BuilderError(400, err instanceof Error ? err.message : String(err))
+    }
+    if (await idTaken(this.pool, this.options.libraryPath, id)) {
+      throw new BuilderError(409, `The id "${id}" is already used by another source.`)
+    }
+    const places = recipe.config.places
+    if (places) {
+      const known = await this.pool.query("SELECT 1 FROM app.data_tables WHERE id = $1", [places.table])
+      if (known.rows.length === 0) throw new BuilderError(400, `There is no places table ${places.table}.`)
+    }
+    const name = toLocalized(draft.state.name, id)
+    let definition: IntegrationDefinition
+    try {
+      definition = await buildDefinition(
+        {
+          id,
+          name,
+          source: draft.state.source ?? { name },
+          trigger: draft.state.trigger ?? {},
+          recipe,
+          ...(places ? { places: { inputId: PLACES_INPUT, tableId: places.table } } : {})
+        },
+        this.options.libraryPath
+      )
+    } catch (err) {
+      throw new BuilderError(400, err instanceof Error ? err.message : String(err))
+    }
+    // Everything the source needs is checked before anything is installed
+    let secrets: Record<string, string> = {}
+    if (definition.secrets?.length) {
+      try {
+        secrets = await getDraftSecrets(this.pool, this.secretKey(), draft.id, definition.secrets)
+      } catch (err) {
+        if (err instanceof MissingSecretError) throw new BuilderError(409, "Waiting for an admin to add the key.")
+        throw err
+      }
+    }
+    const slotIds = Object.keys(definition.files ?? {})
+    const pins: Record<string, string> = {}
+    for (const slotId of slotIds) {
+      const staged = await this.pool.query(
+        `SELECT id FROM app.file_versions WHERE session_id = $1 AND slot_id = $2 AND integration_id IS NULL AND purged_at IS NULL
+         ORDER BY uploaded_at DESC, version DESC LIMIT 1`,
+        [draft.id, slotId]
+      )
+      if (staged.rows.length === 0) throw new BuilderError(400, "Upload a file before accepting the source.")
+      pins[slotId] = staged.rows[0].id
+    }
+    const key = Object.keys(secrets).length > 0 ? this.secretKey() : null
+
+    try {
+      await installIntegration(this.pool, definition, "ready", draft.userId ?? userId)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      throw new BuilderError(/is owned by/.test(message) ? 409 : 400, message)
+    }
+    try {
+      for (const [secretName, value] of Object.entries(secrets)) await setSecret(this.pool, key!, id, secretName, value)
+      // The upload becomes version 1 of its slot (unadopted uploads of this draft only)
+      if (slotIds.length > 0) await adoptSessionFiles(this.pool, draft.id, id)
+    } catch (err) {
+      // Never leave a half-installed source: the draft stays intact for a retry
+      await this.pool.query("DELETE FROM app.integration_secrets WHERE integration_id = $1", [id]).catch(() => {})
+      await deleteIntegration(this.pool, id).catch(() => {})
+      throw err
+    }
+
+    const result: AcceptResult = { integrationId: id }
+    if (definition.trigger.webhook) {
+      const token = await getWebhookToken(this.pool, id)
+      if (token) result.webhookUrl = `/hooks/${token}`
+    } else {
+      try {
+        const queued = await this.pool.query(
+          `INSERT INTO app.runs (integration_id, trigger, status, file_pins) VALUES ($1, 'manual', 'queued', $2::jsonb) RETURNING id`,
+          [id, slotIds.length > 0 ? JSON.stringify(pins) : null]
+        )
+        result.runId = queued.rows[0].id
+      } catch {
+        // The install stands; the run can be started from the integration page
+      }
+    }
+    // The pinned ids now belong to the integration; the draft is done
+    await this.pool.query("DELETE FROM app.draft_secrets WHERE session_id = $1", [draft.id])
+    await this.pool.query("UPDATE app.agent_sessions SET status = 'finished', updated_at = now() WHERE id = $1", [draft.id])
+    const deps = this.options.executor
+    if (deps) {
+      await cleanupScratch(this.pool, deps.store, deps.workRoot, draft.id).catch(err =>
+        console.warn(`builder draft ${draft.id}: scratch not cleaned: ${err instanceof Error ? err.message : err}`)
+      )
+    }
+    return result
   }
 
   /** The encryption key for draft secrets, or 503 when the deployment has none. */
@@ -480,7 +623,7 @@ function refuse(res: ServerResponse, status: number, error: string): void {
 
 /** Matches /api/builder/drafts/:id and its subresources. */
 const DRAFT_PATH =
-  /^\/api\/builder\/drafts\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\/inspect|\/preview|\/places\/suggest|\/secrets|\/secrets\/api_key|\/files\/[^/]+)?$/
+  /^\/api\/builder\/drafts\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\/inspect|\/preview|\/accept|\/places\/suggest|\/secrets|\/secrets\/api_key|\/files\/[^/]+)?$/
 
 /**
  * The /api/builder routes. Returns false when the path is not one of them.
@@ -540,6 +683,8 @@ export async function routeBuilder(
       json(res, 200, await builder.inspect(draft))
     } else if (sub === "/preview" && req.method === "POST") {
       json(res, 200, await builder.preview(draft))
+    } else if (sub === "/accept" && req.method === "POST") {
+      json(res, 200, await builder.accept(draft, user.id))
     } else if (sub === "/places/suggest" && req.method === "POST") {
       const body = await readJsonBody(req)
       json(res, 200, await builder.suggest(draft, body.names))
