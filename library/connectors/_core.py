@@ -4,19 +4,24 @@ Runs as a single file in the python runtime image (pandas, numpy, requests, open
 the standard library only). Connectors start with `from _core import *  # core-import`; the
 build drops that line and prepends this file, so nothing here may rely on the module name.
 """
+import io
 import json
 import os
 import re
 import unicodedata
 
 import pandas as pd
+import requests
 
 __all__ = [
     "normalise", "apply_cleanup", "apply_columns", "match_places", "read_places", "finish",
-    "recipe_config", "UNMATCHED_LIMIT",
+    "recipe_config", "UNMATCHED_LIMIT", "PREVIEW_ROWS", "http_get", "read_tabular", "fetch_table",
+    "cap_rows", "process",
 ]
 
 UNMATCHED_LIMIT = 50
+PREVIEW_ROWS = 5000
+HTTP_TIMEOUT = 60
 DROPPED_WORDS = {"region", "district", "province", "county", "state", "gobolka", "degmada"}
 
 
@@ -100,7 +105,7 @@ def apply_columns(df, columns):
         if kind == "number":
             cleaned = series.map(lambda v: v if not isinstance(v, str) else v.strip().replace(",", ""))
             values = pd.to_numeric(cleaned.where(~blank), errors="coerce")
-            if len(values) and values.dropna().map(float.is_integer).all() and values.notna().any():
+            if len(values) and values.dropna().map(lambda x: float(x).is_integer()).all() and values.notna().any():
                 values = values.astype("Int64")
             bad = values.isna() & ~blank
         elif kind == "date":
@@ -196,3 +201,66 @@ def finish(ctx, df, table_id, unmatched, type_errors):
             "typeErrorCount": len(type_errors),
         },
     }
+
+
+def http_get(url, **kwargs):
+    """GET with a timeout; a non-2xx answer raises a clear error. Headers (which may hold secrets)
+    are never printed."""
+    try:
+        response = requests.get(url, timeout=HTTP_TIMEOUT, **kwargs)
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Could not reach {url}: {type(exc).__name__}") from None
+    if not 200 <= response.status_code < 300:
+        raise RuntimeError(f"Request to {url} failed with status {response.status_code}")
+    return response
+
+
+def read_tabular(data, kind, sheet=None, grid=False):
+    """Read CSV or XLSX bytes as text. grid=True reads without a header row (see apply_cleanup)."""
+    header = None if grid else 0
+    if kind == "xlsx":
+        return pd.read_excel(io.BytesIO(data), sheet_name=sheet or 0, header=header, dtype=str).fillna("")
+    text = data.decode("utf-8-sig", errors="replace")
+    return pd.read_csv(io.StringIO(text), header=header, dtype=str, keep_default_na=False)
+
+
+def _kind_of(name, content_type=""):
+    name = (name or "").lower().split("?")[0]
+    content_type = (content_type or "").lower()
+    if name.endswith((".xlsx", ".xlsm")) or "spreadsheetml" in content_type:
+        return "xlsx"
+    return "csv"
+
+
+def fetch_table(url, cfg, headers=None):
+    """Download a CSV or XLSX (by Content-Type or extension) and read it per the recipe config."""
+    response = http_get(url, headers=headers)
+    kind = _kind_of(url, response.headers.get("Content-Type", ""))
+    grid = bool((cfg.get("cleanup") or {}).get("headerRow"))
+    return read_tabular(response.content, kind, (cfg.get("source") or {}).get("sheet"), grid)
+
+
+def cap_rows(df, cfg):
+    """Preview runs read at most PREVIEW_ROWS rows."""
+    return df.head(PREVIEW_ROWS) if cfg.get("mode") == "preview" else df
+
+
+def process(ctx, raw):
+    """Everything after reading: inspect output, clean-up, typing, places, output."""
+    cfg = recipe_config(ctx)
+    df = apply_cleanup(cap_rows(raw, cfg), cfg.get("cleanup"))
+    if cfg.get("mode") == "inspect":
+        os.makedirs(ctx.out_dir, exist_ok=True)
+        columns = []
+        for name in df.columns:
+            sample = [v for v in df[name].tolist() if not _blank(v)][:5]
+            columns.append({"name": str(name), "sample": [v if isinstance(v, (int, float, bool)) else str(v) for v in sample]})
+        with open(os.path.join(ctx.out_dir, "inspect.json"), "w", encoding="utf-8") as f:
+            json.dump({"columns": columns, "rows": int(len(df))}, f)
+        return {"tables": [], "state": {}}
+    df, type_errors = apply_columns(df, cfg.get("columns") or [])
+    unmatched = []
+    places = cfg.get("places")
+    if places:
+        df, unmatched = match_places(df, places, read_places(ctx, places))
+    return finish(ctx, df, ctx.definition["id"], unmatched, type_errors)

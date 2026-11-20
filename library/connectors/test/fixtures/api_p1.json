@@ -1,0 +1,1 @@
+{"data": {"items": [{"region": "A", "meta": {"cases": 1}}, {"region": "B", "meta": {"cases": 2}}]}, "links": {"next": "https://api.example.org/v1?page=2"}}

@@ -25,6 +25,11 @@ ROWS = [{"name": "Banaadir", "code": "SO22"}, {"name": "Bari Region", "code": "S
 
 
 class CoreTests(unittest.TestCase):
+    def test_number_cast_accepts_native_integers(self):
+        out, errors = apply_columns(pd.DataFrame({"n": [1, 2]}), [{"from": "n", "id": "n", "type": "number"}])
+        self.assertEqual(out["n"].tolist(), [1, 2])
+        self.assertEqual(errors, [])
+
     def test_normalise_cases(self):
         with open(os.path.join(os.path.dirname(HERE), "normalise_cases.json")) as f:
             cases = json.load(f)

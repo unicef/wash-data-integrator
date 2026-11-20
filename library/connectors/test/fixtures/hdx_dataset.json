@@ -1,0 +1,3 @@
+{"result": {"name": "som-cases", "resources": [
+ {"id": "r1", "url": "https://data.humdata.org/other.csv"},
+ {"id": "r2", "url": "https://data.humdata.org/dataset/som-cases/resource/r2/download/cases.csv"}]}}
