@@ -162,3 +162,52 @@ export async function copySecret(
   await setSecret(pool, key, toIntegrationId, name, decryptSecret(key, source.rows[0].value))
   return true
 }
+
+/**
+ * Stores (upserts) one builder draft's secret. Draft secrets live beside
+ * integration secrets under the same key and envelope; the draft owns them
+ * until its source is accepted, and they go with the draft.
+ */
+export async function setDraftSecret(
+  pool: pg.Pool,
+  key: Buffer,
+  sessionId: string,
+  name: string,
+  value: string
+): Promise<void> {
+  await pool.query(
+    `INSERT INTO app.draft_secrets (session_id, name, value) VALUES ($1, $2, $3)
+     ON CONFLICT (session_id, name) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+    [sessionId, name, encryptSecret(key, value)]
+  )
+}
+
+/** Fetches and decrypts a builder draft's named secrets; a missing name is an error. */
+export async function getDraftSecrets(
+  pool: pg.Pool,
+  key: Buffer,
+  sessionId: string,
+  names: string[]
+): Promise<Record<string, string>> {
+  if (names.length === 0) return {}
+  const result = await pool.query("SELECT name, value FROM app.draft_secrets WHERE session_id = $1 AND name = ANY($2)", [
+    sessionId,
+    names
+  ])
+  const found = new Map(result.rows.map(r => [r.name as string, r.value as Buffer]))
+  const secrets: Record<string, string> = {}
+  for (const name of names) {
+    const stored = found.get(name)
+    if (!stored) throw new Error(`Secret ${name} is not set for this draft`)
+    secrets[name] = decryptSecret(key, stored)
+  }
+  return secrets
+}
+
+/** Lists a builder draft's secret names and update times; never values. */
+export async function listDraftSecrets(pool: pg.Pool, sessionId: string): Promise<{ name: string; updatedAt: string }[]> {
+  const result = await pool.query("SELECT name, updated_at FROM app.draft_secrets WHERE session_id = $1 ORDER BY name", [
+    sessionId
+  ])
+  return result.rows.map(row => ({ name: row.name, updatedAt: row.updated_at.toISOString() }))
+}

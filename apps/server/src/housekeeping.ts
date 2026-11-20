@@ -11,6 +11,8 @@
  * - scratch areas (draft tables, preview layers, /work) of design sessions
  *   idle for SCRATCH_IDLE_DAYS; the transcript stays and a resumed session
  *   simply re-runs;
+ * - source builder drafts untouched for DRAFT_MAX_AGE_HOURS, whole: draft
+ *   schema, uploads, key, scratch runs and the draft itself;
  * - raster store snapshot directories no snapshot row refers to, left by
  *   runs that failed after storing files, once a day old.
  *
@@ -24,6 +26,7 @@ import { RasterStore } from "./rasterStore.js"
 import { cleanupScratch, draftSchema } from "./scratch.js"
 import { sweepJobTmp } from "./jobTmp.js"
 import { disableInactiveAccounts } from "./accountPolicy.js"
+import { deleteBuilderDraft, DRAFT_MAX_AGE_HOURS } from "./builder/drafts.js"
 
 /** Consumed webhook events are kept this long for debugging deliveries. */
 export const WEBHOOK_EVENT_DAYS = 30
@@ -49,6 +52,8 @@ export interface HousekeepingResult {
   runLogs: number
   /** Design sessions whose scratch area was removed */
   scratchSessions: number
+  /** Builder drafts removed after DRAFT_MAX_AGE_HOURS */
+  builderDrafts: number
   /** Orphaned store snapshot directories removed */
   orphanSnapshots: number
   /** Job /tmp directories left by a crashed process removed */
@@ -75,6 +80,7 @@ export async function sweepHousekeeping(pool: pg.Pool, store: RasterStore, workR
     webhookEvents,
     runLogs,
     scratchSessions: await sweepIdleScratch(pool, store, workRoot),
+    builderDrafts: await sweepBuilderDrafts(pool, store, workRoot),
     orphanSnapshots: await sweepOrphanSnapshots(pool, store),
     leftoverJobTmp: await sweepJobTmp(workRoot)
   }
@@ -100,6 +106,18 @@ async function sweepIdleScratch(pool: pg.Pool, store: RasterStore, workRoot: str
     cleaned++
   }
   return cleaned
+}
+
+/** Removes builder drafts untouched for DRAFT_MAX_AGE_HOURS that have no run in progress. */
+async function sweepBuilderDrafts(pool: pg.Pool, store: RasterStore, workRoot: string): Promise<number> {
+  const stale = await pool.query(
+    `SELECT s.id FROM app.agent_sessions s
+     WHERE s.kind = 'builder' AND s.updated_at < now() - make_interval(hours => $1)
+       AND NOT EXISTS (SELECT 1 FROM app.runs r WHERE r.session_id = s.id AND r.status IN ('queued', 'running'))`,
+    [DRAFT_MAX_AGE_HOURS]
+  )
+  for (const { id } of stale.rows as { id: string }[]) await deleteBuilderDraft(pool, store, workRoot, id)
+  return stale.rows.length
 }
 
 /** Removes `<layer>/<snapshotId>/` directories with no raster_snapshots row, once old enough. */

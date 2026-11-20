@@ -28,7 +28,7 @@ export interface FileApiOptions {
 }
 
 /** Upload routes: the only requests whose `Expect: 100-continue` waits for the checks. */
-export const UPLOAD_PATH = /^\/api\/(?:integrations\/[a-z][a-z0-9_]*|sessions\/[0-9a-f-]+)\/files\/[^/]+$/
+export const UPLOAD_PATH = /^\/api\/(?:integrations\/[a-z][a-z0-9_]*|sessions\/[0-9a-f-]+|builder\/drafts\/[0-9a-f-]+)\/files\/[^/]+$/
 
 /** Whole-request deadline for the server: large uploads on slow links outlast the five minute default. */
 export const REQUEST_DEADLINE_MS = 60 * 60 * 1000
@@ -248,7 +248,10 @@ export async function handleSessionUpload(
   }
   const kind = await pool.query("SELECT kind FROM app.agent_sessions WHERE id = $1", [sessionId])
   if (kind.rows.length === 0) return refuse(res, 404, "unknown session")
-  if (kind.rows[0].kind !== "designer") return refuse(res, 400, "Only integration design sessions take files")
+  // Builder drafts stage their uploaded file the same way; the builder route checks who may
+  if (kind.rows[0].kind !== "designer" && kind.rows[0].kind !== "builder") {
+    return refuse(res, 400, "Only integration design sessions and builder drafts take files")
+  }
   const version = await receive(pool, options, req, res, owner, { slotId, ...target, uploadedBy: user.id })
   if (version) json(res, 201, { version: versionJson(version) })
 }

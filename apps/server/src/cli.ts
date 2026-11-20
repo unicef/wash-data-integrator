@@ -55,6 +55,7 @@ import { SandboxBudget } from "./sandboxBudget.js"
 import { RasterStore } from "./rasterStore.js"
 import { TileRenderer } from "./tiles.js"
 import { createApiServer } from "./server.js"
+import { BuilderService } from "./builder/drafts.js"
 import { basemapConfigFrom, BasemapProxy } from "./basemap.js"
 import { AppConfig, describeConfig, loadConfig } from "./config.js"
 import { AiRuntime } from "./aiSettings.js"
@@ -606,7 +607,8 @@ async function main(): Promise<number> {
           assistantAgent,
           ai,
           config.viteDevUrl,
-          { store: deps.files!, maxUploadMb: config.fileUploadMaxMb }
+          { store: deps.files!, maxUploadMb: config.fileUploadMaxMb },
+          new BuilderService(pool, { libraryPath: config.libraryPath, executor: deps })
         ).listen(
           config.port,
           () => {

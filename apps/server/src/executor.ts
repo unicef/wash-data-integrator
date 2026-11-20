@@ -297,7 +297,18 @@ export interface RunOptions {
     definition: IntegrationDefinition
     /** The session's file pins per slot; declared slots without one read the integration's current version */
     files?: Record<string, string>
+    /**
+     * Secret values for the run in place of the integration's stored ones: a
+     * builder draft's key belongs to the draft, not yet to any integration
+     */
+    secrets?: Record<string, string>
   }
+  /**
+   * Called with the job's /out directory after the job succeeds and before
+   * anything commits, for output that is not a table or raster (a builder
+   * draft's inspect.json). The directory is removed after the run.
+   */
+  onJobOutput?: (outDir: string) => Promise<void>
 }
 
 /**
@@ -405,9 +416,11 @@ export async function executeRun(deps: ExecutorDeps, run: RunRow, opts?: RunOpti
     const image = deps.images[definition.runtime]
     if (!image) throw new Error(`No image configured for runtime ${definition.runtime}`)
 
-    const secrets = definition.secrets?.length
-      ? await getSecrets(deps.pool, requireKey(deps), definition.id, definition.secrets)
-      : {}
+    const secrets = scratch?.secrets
+      ? scratch.secrets
+      : definition.secrets?.length
+        ? await getSecrets(deps.pool, requireKey(deps), definition.id, definition.secrets)
+        : {}
     redact = secretRedactor(secrets)
     let previousState: unknown = null
     if (!cold) {
@@ -572,6 +585,7 @@ export async function executeRun(deps: ExecutorDeps, run: RunRow, opts?: RunOpti
     }
 
     const output = parseJobOutput<RunResult>(jobResult)
+    if (opts?.onJobOutput) await opts.onJobOutput(outDir)
     const schema = scratch ? draftSchema(scratch.sessionId) : "data"
     const layerRowFor = (layerId: string) => (scratch ? scratchLayerId(scratch.sessionId, layerId) : layerId)
 

@@ -85,6 +85,7 @@ import { AiRuntime, aiSettingsView, buildModel, parseAiConfig, saveAiConfig, tes
 import { SUPPORTED_LOCALES } from "@data-integrator/definitions"
 import { catalogTranslationStatus, startCatalogTranslation, translateDefinition, wrapDefinitionStrings } from "./localizeCatalog.js"
 import { createManagedUser, listUsers, resetPassword, setDisabled, setRole } from "./users.js"
+import { BuilderService, routeBuilder } from "./builder/drafts.js"
 
 /** Static assets directory (demo map page). */
 const STATIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "static")
@@ -167,6 +168,7 @@ const COOKIE_MAX_AGE = 30 * 24 * 3600
  * @param ai - Live AI settings; while AI is off the session services are
  *   withheld. Null leaves the services as given, with no provider
  * @param viteDevUrl - Live Vite origin; null serves the built SPA from dist
+ * @param builder - Source builder drafts; null when the host cannot run previews
  */
 export function createApiServer(
   pool: pg.Pool,
@@ -181,7 +183,8 @@ export function createApiServer(
   assistantAgent: AgentService | null = null,
   ai: AiRuntime | null = null,
   viteDevUrl: string | null = null,
-  files: FileApiOptions | null = null
+  files: FileApiOptions | null = null,
+  builder: BuilderService | null = null
 ): Server {
   const uiDist = uiDistPath ?? DEFAULT_UI_DIST
   const handle = async (req: IncomingMessage, res: ServerResponse) => {
@@ -192,7 +195,7 @@ export function createApiServer(
       const live = ai === null || ai.configured()
       const model = ai?.configured() ? ai.model : null
       await route(pool, tiles, live ? agent : null, runs, store, live ? dashboardAgent : null, basemap, uiDist, libraryPath,
-        live ? assistantAgent : null, ai?.provider ?? null, viteDevUrl, model, files, ai, req, res)
+        live ? assistantAgent : null, ai?.provider ?? null, viteDevUrl, model, files, ai, builder, req, res)
     } catch (err) {
       if (!res.headersSent) res.writeHead(err instanceof ClientError ? err.status : 500, { "content-type": "application/json" })
       res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }))
@@ -251,6 +254,7 @@ async function route(
   model: LanguageModel | null,
   files: FileApiOptions | null,
   ai: AiRuntime | null,
+  builder: BuilderService | null,
   req: IncomingMessage,
   res: ServerResponse
 ): Promise<void> {
@@ -423,6 +427,9 @@ async function route(
     json(res, 200, { countries: COUNTRIES })
     return
   }
+
+  // Source builder drafts: work without AI, so ahead of the session routes
+  if (await routeBuilder(builder, files, pool, user, req, res, pathname, searchParams)) return
 
   // Secrets: per-integration write-only credential store. Names and update
   // times are visible to editors and admins; values are set or replaced by
@@ -1918,6 +1925,11 @@ async function routeSessions(
     return
   }
   const ownerKind: string = owner.rows[0].kind
+  // Builder drafts have their own routes, which check who may see them
+  if (ownerKind === "builder") {
+    json(res, 404, { error: "unknown session" })
+    return
+  }
   // Explore chats are private to their creator: admins may read and delete
   // other people's, and nobody else learns that they exist
   if (ownerKind === "assistant" && owner.rows[0].user_id !== user.id) {
