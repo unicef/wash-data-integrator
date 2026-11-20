@@ -17,9 +17,9 @@ def run(ctx):
     cfg = recipe_config(ctx)
     source = cfg["source"]
     name = _dataset_name(source["url"])
-    meta = http_get("https://data.humdata.org/api/3/action/package_show", params={"id": name}).json()
+    meta = http_json(http_get("https://data.humdata.org/api/3/action/package_show", params={"id": name}))
     resources = (meta.get("result") or {}).get("resources") or []
     match = [r for r in resources if r.get("id") == source.get("resourceId")]
     if not match:
         raise ValueError(f"Resource {source.get('resourceId')} was not found in HDX dataset {name}")
-    return process(ctx, fetch_table(match[0]["url"], {**cfg, "source": {**source, "url": match[0]["url"]}}))
+    return process(ctx, fetch_table(match[0]["url"], {**cfg, "source": {**source, "url": match[0]["url"]}}, fmt=match[0].get("format")))

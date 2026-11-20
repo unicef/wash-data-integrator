@@ -8,6 +8,7 @@ import io
 import json
 import os
 import re
+from urllib.parse import urlparse
 import unicodedata
 
 import pandas as pd
@@ -16,7 +17,7 @@ import requests
 __all__ = [
     "normalise", "apply_cleanup", "apply_columns", "match_places", "read_places", "finish",
     "recipe_config", "UNMATCHED_LIMIT", "PREVIEW_ROWS", "http_get", "read_tabular", "fetch_table",
-    "cap_rows", "process",
+    "cap_rows", "process", "table_kind", "http_json", "row_limit",
 ]
 
 UNMATCHED_LIMIT = 50
@@ -203,52 +204,108 @@ def finish(ctx, df, table_id, unmatched, type_errors):
     }
 
 
-def http_get(url, **kwargs):
+def _safe_url(url):
+    """The URL without its query string or fragment, for messages (they may carry keys)."""
+    parts = urlparse(str(url))
+    return f"{parts.scheme}://{parts.netloc}{parts.path}"
+
+
+def http_get(url, same_host_only=False, **kwargs):
     """GET with a timeout; a non-2xx answer raises a clear error. Headers (which may hold secrets)
-    are never printed."""
-    try:
-        response = requests.get(url, timeout=HTTP_TIMEOUT, **kwargs)
-    except requests.RequestException as exc:
-        raise RuntimeError(f"Could not reach {url}: {type(exc).__name__}") from None
+    are never printed. With same_host_only (keyed requests) redirects are followed by hand and one
+    to another host fails, so a key is never sent elsewhere."""
+    def fetch(target):
+        try:
+            if same_host_only:
+                return requests.get(target, timeout=HTTP_TIMEOUT, allow_redirects=False, **kwargs)
+            return requests.get(target, timeout=HTTP_TIMEOUT, **kwargs)
+        except requests.RequestException as exc:
+            raise RuntimeError(f"Could not reach {_safe_url(target)}: {type(exc).__name__}") from None
+
+    current = url
+    response = fetch(current)
+    hops = 0
+    while same_host_only and response.status_code in (301, 302, 303, 307, 308):
+        location = response.headers.get("Location")
+        if not location or hops >= 5:
+            raise RuntimeError(f"Too many redirects from {_safe_url(url)}")
+        target = requests.compat.urljoin(current, location)
+        if urlparse(target).netloc != urlparse(url).netloc:
+            raise RuntimeError(
+                f"{_safe_url(url)} redirected to another host ({urlparse(target).netloc}); "
+                "the API key was not sent there")
+        current, hops = target, hops + 1
+        response = fetch(current)
     if not 200 <= response.status_code < 300:
-        raise RuntimeError(f"Request to {url} failed with status {response.status_code}")
+        raise RuntimeError(f"Request to {_safe_url(current)} failed with status {response.status_code}")
     return response
+
+
+def http_json(response):
+    """The JSON body, or a clear error when the source did not return JSON."""
+    try:
+        return response.json()
+    except ValueError:
+        kind = response.headers.get("Content-Type", "unknown")
+        raise RuntimeError(f"The source did not return JSON (status {response.status_code}, content type {kind})") from None
+
+
+def row_limit(cfg):
+    """Preview and inspect runs read at most PREVIEW_ROWS rows; a normal run is unlimited."""
+    return PREVIEW_ROWS if cfg.get("mode") in ("preview", "inspect") else None
 
 
 def read_tabular(data, kind, sheet=None, grid=False):
     """Read CSV or XLSX bytes as text. grid=True reads without a header row (see apply_cleanup)."""
     header = None if grid else 0
-    if kind == "xlsx":
+    if kind in ("xlsx", "xls"):
         return pd.read_excel(io.BytesIO(data), sheet_name=sheet or 0, header=header, dtype=str).fillna("")
     text = data.decode("utf-8-sig", errors="replace")
     return pd.read_csv(io.StringIO(text), header=header, dtype=str, keep_default_na=False)
 
 
-def _kind_of(name, content_type=""):
-    name = (name or "").lower().split("?")[0]
+def table_kind(name, content_type="", fmt=""):
+    """csv, xlsx or xls: the declared format first, then the Content-Type, then the extension."""
+    fmt = (fmt or "").lower().strip(". ")
+    if fmt in ("csv", "xlsx", "xls"):
+        return fmt
     content_type = (content_type or "").lower()
-    if name.endswith((".xlsx", ".xlsm")) or "spreadsheetml" in content_type:
+    name = (name or "").lower().split("?")[0]
+    if "spreadsheetml" in content_type:
         return "xlsx"
+    if "ms-excel" in content_type:
+        return "xls"
+    if name.endswith((".xlsx", ".xlsm")):
+        return "xlsx"
+    if name.endswith(".xls"):
+        return "xls"
     return "csv"
 
 
-def fetch_table(url, cfg, headers=None):
-    """Download a CSV or XLSX (by Content-Type or extension) and read it per the recipe config."""
+def fetch_table(url, cfg, headers=None, fmt=""):
+    """Download a CSV or Excel file and read it per the recipe config."""
     response = http_get(url, headers=headers)
-    kind = _kind_of(url, response.headers.get("Content-Type", ""))
+    kind = table_kind(url, response.headers.get("Content-Type", ""), fmt)
     grid = bool((cfg.get("cleanup") or {}).get("headerRow"))
     return read_tabular(response.content, kind, (cfg.get("source") or {}).get("sheet"), grid)
 
 
 def cap_rows(df, cfg):
     """Preview runs read at most PREVIEW_ROWS rows."""
-    return df.head(PREVIEW_ROWS) if cfg.get("mode") == "preview" else df
+    limit = row_limit(cfg)
+    return df.head(limit) if limit else df
 
 
 def process(ctx, raw):
     """Everything after reading: inspect output, clean-up, typing, places, output."""
     cfg = recipe_config(ctx)
-    df = apply_cleanup(cap_rows(raw, cfg), cfg.get("cleanup"))
+    wanted = [c["from"] for c in cfg.get("columns") or []]
+    if len(raw) == 0:
+        # An empty source gives an empty table with every declared column, not a failure
+        print("No rows in the source")
+        df = pd.DataFrame(columns=list(dict.fromkeys(list(raw.columns) + wanted)))
+    else:
+        df = apply_cleanup(cap_rows(raw, cfg), cfg.get("cleanup"))
     if cfg.get("mode") == "inspect":
         os.makedirs(ctx.out_dir, exist_ok=True)
         columns = []

@@ -1,6 +1,6 @@
 from _core import *  # core-import
+from urllib.parse import urlparse
 import pandas as pd
-
 
 MAX_PAGES = 200
 
@@ -11,26 +11,38 @@ def _dig(value, path):
     return value
 
 
+def _records(body, path):
+    items = _dig(body, path) if path else body
+    if items is None:
+        raise ValueError(f"Records path '{path}' not found in the response")
+    if not isinstance(items, list):
+        where = f"at '{path}'" if path else "in the response"
+        raise ValueError(f"Expected a list of records {where}, found {type(items).__name__}")
+    return items
+
+
 def run(ctx):
     cfg = recipe_config(ctx)
     source = cfg["source"]
+    keyed = source.get("auth") == "key"
     headers = {}
-    if source.get("auth") == "key":
+    if keyed:
         header = source.get("keyHeader") or "Authorization"
         key = ctx.secrets["api_key"]
         headers[header] = f"Bearer {key}" if header.lower() == "authorization" else key
     paging = source.get("paging") or {"type": "none"}
     url, params = source["url"], {}
+    home = urlparse(url).netloc
     if paging["type"] == "page":
         page = int(paging.get("start", 1))
         params[paging.get("param", "page")] = page
-    limit = PREVIEW_ROWS if cfg.get("mode") == "preview" else None
+    limit = row_limit(cfg)
     records = []
     for _ in range(MAX_PAGES):
-        body = http_get(url, headers=headers, params=params or None).json()
-        items = _dig(body, source.get("recordsPath")) if source.get("recordsPath") else body
-        if isinstance(items, dict):
-            items = [items]
+        response = http_get(url, same_host_only=keyed and urlparse(url).netloc == home,
+                            headers=headers, params=params or None)
+        body = http_json(response)
+        items = _records(body, source.get("recordsPath"))
         if not items:
             break
         records.extend(items)
@@ -41,6 +53,8 @@ def run(ctx):
             url, params = _dig(body, paging.get("path", "links.next")), {}
             if not url:
                 break
+            if keyed and urlparse(url).netloc != home:
+                headers = {}  # never send the key to another host
         else:
             break
         if limit and len(records) >= limit:

@@ -15,5 +15,6 @@ def run(ctx):
     # The platform hands over payloads only, so the receipt time is the time of this run.
     received_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     raw = pd.json_normalize(records).astype(object)
-    raw["received_at"] = received_at
+    if len(raw):
+        raw["received_at"] = received_at
     return process(ctx, raw)

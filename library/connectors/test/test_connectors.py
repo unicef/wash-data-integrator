@@ -319,6 +319,121 @@ class WebhookTests(Base):
         self.assertEqual(names, ["station", "reading.level", "received_at"])
 
 
+class FixRoundTests(Base):
+    def test_arcgis_requests_wgs84(self):
+        ctx = self.ctx(ArcgisTests().cfg())
+        with mock.patch("requests.get", return_value=Resp(fixture("arcgis_p2.json"))) as g:
+            self.connector("arcgis").run(ctx)
+        self.assertEqual(g.call_args.kwargs["params"]["outSR"], 4326)
+
+    def test_arcgis_stops_on_repeated_page_and_caps(self):
+        ctx = self.ctx(ArcgisTests().cfg())
+        with mock.patch("requests.get", return_value=Resp(fixture("arcgis_p1.json"))) as g:
+            self.connector("arcgis").run(ctx)
+        self.assertEqual(g.call_count, 2)
+        self.assertEqual(len(self.out_rows(ctx)), 2)
+
+        n = {"i": 0}
+
+        def endless(url, **kw):
+            n["i"] += 1
+            f = {"attributes": {"NAME": f"r{n['i']}", "N": n["i"]}, "geometry": {"x": 1, "y": 2}}
+            return Resp(json.dumps({"features": [f], "exceededTransferLimit": True}).encode())
+        ctx = self.ctx(ArcgisTests().cfg())
+        with mock.patch("requests.get", side_effect=endless):
+            self.connector("arcgis").run(ctx)
+        self.assertEqual(n["i"], 200)
+
+    def test_inspect_is_capped(self):
+        body = "Region,Cases\n" + "".join(f"R{i},{i}\n" for i in range(6000))
+        ctx = self.ctx({"mode": "inspect", "source": {"url": "https://x.org/a.csv"}, "columns": []})
+        with mock.patch("requests.get", return_value=Resp(body.encode())):
+            self.connector("sheet_link").run(ctx)
+        self.assertEqual(self.inspect(ctx)["rows"], 5000)
+
+    def test_webhook_without_messages_gives_empty_table(self):
+        ctx = self.ctx({"source": {}, "columns": WebhookTests.COLS}, webhook_data=None)
+        result = self.connector("webhook").run(ctx)
+        out = self.out_rows(ctx)
+        self.assertEqual(len(out), 0)
+        self.assertEqual(list(out.columns), ["station", "level", "received_at"])
+        self.assertEqual(result["state"]["rows"], 0)
+
+    def test_web_api_zero_records_gives_empty_table(self):
+        ctx = self.ctx(WebApiTests().cfg(paging={"type": "none"}))
+        with mock.patch("requests.get", return_value=Resp(b'{"data": {"items": []}}')):
+            self.connector("web_api").run(ctx)
+        self.assertEqual(list(self.out_rows(ctx).columns), ["region", "cases"])
+
+    def test_key_not_sent_to_other_host_on_next_link(self):
+        sent = []
+
+        def fake(url, **kw):
+            sent.append((url, dict(kw.get("headers") or {})))
+            if "other.org" in url:
+                return Resp(fixture("api_p2.json"))
+            body = json.loads(fixture("api_p1.json"))
+            body["links"]["next"] = "https://other.org/v1?page=2&token=zzz"
+            return Resp(json.dumps(body).encode())
+        ctx = self.ctx(WebApiTests().cfg(auth="key"), secrets={"api_key": "s3cret"})
+        with mock.patch("requests.get", side_effect=fake):
+            self.connector("web_api").run(ctx)
+        self.assertIn("Authorization", sent[0][1])
+        self.assertEqual(sent[1][1], {})
+
+    def test_redirect_to_other_host_fails_without_leaking(self):
+        r = Resp(b"", status=302)
+        r.headers["Location"] = "https://evil.org/x?k=1"
+        ctx = self.ctx(WebApiTests().cfg(auth="key", paging={"type": "none"}), secrets={"api_key": "s3cret"})
+        with mock.patch("requests.get", return_value=r) as g:
+            with self.assertRaisesRegex(RuntimeError, "another host"):
+                self.connector("web_api").run(ctx)
+        self.assertEqual(g.call_count, 1)
+        self.assertFalse(g.call_args.kwargs["allow_redirects"])
+
+    def test_error_message_strips_query_string(self):
+        ctx = self.ctx({"source": {"url": "https://x.org/a.csv?token=abc"}, "columns": COLS})
+        with mock.patch("requests.get", return_value=Resp(b"", status=500)):
+            with self.assertRaises(RuntimeError) as cm:
+                self.connector("sheet_link").run(ctx)
+        self.assertNotIn("abc", str(cm.exception))
+
+    def test_table_kind(self):
+        core = importlib.import_module("_core")
+        self.assertEqual(core.table_kind("a.xls"), "xls")
+        self.assertEqual(core.table_kind("a.bin", "", "XLSX"), "xlsx")
+        self.assertEqual(core.table_kind("a.csv", "application/vnd.ms-excel"), "xls")
+        self.assertEqual(core.table_kind("download"), "csv")
+        self.assertEqual(core.table_kind("a.csv", "", "XLS"), "xls")
+
+    def test_hdx_uses_resource_format(self):
+        meta = {"result": {"resources": [{"id": "r2", "format": "XLSX", "url": "https://h.org/download/12345"}]}}
+        data = xlsx_bytes({"S": pd.DataFrame({"Region": ["A"], "Cases": [1]})})
+
+        def fake(url, **kw):
+            if "package_show" in url:
+                return Resp(json.dumps(meta).encode())
+            return Resp(data, content_type="application/octet-stream")
+        ctx = self.ctx(HdxTests().cfg())
+        with mock.patch("requests.get", side_effect=fake):
+            self.connector("hdx").run(ctx)
+        self.assertEqual(self.out_rows(ctx)["region"].tolist(), ["A"])
+
+    def test_records_path_errors(self):
+        for body, pattern in ((b'{"other": 1}', "Records path 'data.items' not found"),
+                              (b'{"data": {"items": "x"}}', "Expected a list")):
+            ctx = self.ctx(WebApiTests().cfg(paging={"type": "none"}))
+            with mock.patch("requests.get", return_value=Resp(body)):
+                with self.assertRaisesRegex(ValueError, pattern):
+                    self.connector("web_api").run(ctx)
+
+    def test_non_json_body(self):
+        ctx = self.ctx(WebApiTests().cfg(paging={"type": "none"}))
+        with mock.patch("requests.get", return_value=Resp(b"<html>", content_type="text/html")):
+            with self.assertRaisesRegex(RuntimeError, r"did not return JSON \(status 200, content type text/html\)"):
+                self.connector("web_api").run(ctx)
+
+
 class JoinedTests(unittest.TestCase):
     def test_joined_files_compile(self):
         core = read_text(os.path.join(CONNECTORS, "_core.py")).rstrip()

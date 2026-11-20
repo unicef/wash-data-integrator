@@ -11,7 +11,7 @@ def run(ctx):
     if not entry:
         raise ValueError("No file has been uploaded for this source yet")
     path = os.path.join(ctx.in_dir, entry["path"])
-    kind = "xlsx" if path.lower().endswith((".xlsx", ".xlsm")) else "csv"
+    kind = table_kind(path)
     grid = bool((cfg.get("cleanup") or {}).get("headerRow"))
     with open(path, "rb") as f:
         raw = read_tabular(f.read(), kind, (cfg.get("source") or {}).get("sheet"), grid)
