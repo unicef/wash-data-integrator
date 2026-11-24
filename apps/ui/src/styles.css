@@ -336,6 +336,9 @@ body.col-resizing iframe { pointer-events: none }
 }
 .login-card h1 { margin: 0 0 8px; font-size: 20px; text-align: center }
 .login-card input { padding: 9px 12px; border: 1px solid var(--control-border); border-radius: 6px; font: inherit }
+.login-card p { margin: 0; text-align: center }
+.login-card a { text-align: center }
+.login-card a.login-action { padding: 9px 12px; border-radius: 6px; background: var(--accent); color: var(--accent-ink); text-decoration: none }
 .list-page.wide { max-width: 1320px }
 .locale-checks { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 10px 0 }
 .locale-checks label { display: flex; align-items: center; gap: 6px }

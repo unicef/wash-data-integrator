@@ -608,7 +608,8 @@ async function main(): Promise<number> {
           ai,
           config.viteDevUrl,
           { store: deps.files!, maxUploadMb: config.fileUploadMaxMb },
-          new BuilderService(pool, { libraryPath: config.libraryPath, executor: deps })
+          new BuilderService(pool, { libraryPath: config.libraryPath, executor: deps }),
+          config.ewsSso
         ).listen(
           config.port,
           () => {

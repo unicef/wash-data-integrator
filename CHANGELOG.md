@@ -28,6 +28,16 @@ changes the database (applied by `deploy/update.sh`) or the runtime images
   version an installed built copy came from (all applied by
   `deploy/update.sh`). No image rebuild needed.
 
+**Single sign-on from the EWS**
+
+- Optional sign-in through the UNICEF WASH Early Warning System:
+  `GET /auth/ews-sso` accepts a short-lived, single-use HS256 handover token
+  and signs the browser in as one shared account. With
+  `EWS_DI_SSO_LOGIN_URL` set, signed-out browsers go to the EWS instead of the
+  login form; local login stays at `/?local=1`, and signing out lands on a
+  "Signed out" page. Off unless `EWS_DI_SSO_SECRET` is set. See "Single
+  sign-on from the EWS" in `docs/Deployment.md`. No database change.
+
 ## 1.0.0 (2026-10-30)
 
 First public release of the mWater Data Integrator, the reference

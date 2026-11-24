@@ -409,10 +409,26 @@ async function request<T>(url: string, init?: RequestInit, quiet401 = false): Pr
   return body as T
 }
 
-/** The signed-in user with AI wiring, or null when not authenticated. */
+/** The EWS sign-in address from the last signed-out /api/me; null when single sign-on is off. */
+let ewsLogin: string | null = null
+
+/** Where a signed-out browser signs in when the deployment uses EWS single sign-on; null otherwise. */
+export function ewsLoginUrl(): string | null {
+  return ewsLogin
+}
+
+/**
+ * The signed-in user with AI wiring, or null when not authenticated. A
+ * signed-out answer also says whether sign-in goes through the EWS.
+ */
 export async function getMe(): Promise<Me | null> {
   try {
-    return await request<Me>("/api/me", undefined, true)
+    const res = await fetch("/api/me")
+    const body = await res.json().catch(() => ({}))
+    if (res.ok) return body as Me
+    const url = (body as { ewsLoginUrl?: unknown }).ewsLoginUrl
+    ewsLogin = res.status === 401 && typeof url === "string" && /^https?:\/\//.test(url) ? url : null
+    return null
   } catch {
     return null
   }

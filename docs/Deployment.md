@@ -156,6 +156,50 @@ Public dashboards reach only people who pass the proxy. The session cookie
 (`di_session`, host-only, `HttpOnly`, `SameSite=Lax`) does not clash with the
 proxy's own cookie.
 
+### Single sign-on from the EWS
+
+The UNICEF WASH Early Warning System (EWS) can sign its users in to the Data
+Integrator, so signing in to the EWS is the only sign-in they see. The EWS
+signs a handover token (a compact JWT, HS256, valid for 60 seconds, accepted
+once) with a secret both apps share, and redirects the browser to
+`GET /auth/ews-sso?token=...&next=<path>`. The DI checks the signature,
+issuer, audience, expiry and nonce, signs the browser in with a normal
+`di_session` as one shared account, logs an `auth.ews_sso` security event with
+the EWS user's email (`ewsSubject`), and redirects to `next` (a relative path
+only; anything else goes to `/`). A refused token shows a plain error page
+with a link back to the EWS; it never redirects.
+
+Set in `/etc/data-integrator/env`, then restart the service:
+
+```sh
+EWS_DI_SSO_SECRET=<the secret also set in the EWS, at least 32 characters>
+EWS_DI_SSO_LOGIN_URL=https://ews.t4d.world/api/di/sso
+# Optional; these are the defaults:
+EWS_DI_SSO_ACCOUNT=ews@gmail.com
+EWS_DI_SSO_ROLE=editor
+```
+
+- The shared account ("earlywarning" in these docs; DI users have no display
+  name) is created on first use with `EWS_DI_SSO_ROLE` and a password hash no
+  password matches. Password sign-in for it is refused while single sign-on is
+  on, even if an admin sets a password. Disable the account to stop all EWS
+  sign-ins at once.
+- With `EWS_DI_SSO_LOGIN_URL` set, the web app sends a signed-out browser to
+  the EWS (with the page it wanted as `next`) instead of the login form.
+  Requests with `Authorization: Bearer` are unaffected and still get 401 JSON.
+- Local login stays at `/?local=1` for administrators.
+- Signing out lands on a "Signed out" page with "Sign in with EWS" and "Local
+  admin login", so it does not sign straight back in. If a sign-in through the
+  EWS does not complete (for example the browser refuses the cookie), the app
+  shows that page instead of redirecting again.
+- Used nonces are kept in memory until their token expires, which suits the
+  single server process this deployment runs.
+- The EWS embeds the DI in a frame. That works because both hosts are on the
+  same site (`*.t4d.world`), so the `SameSite=Lax` session cookie is sent in
+  the frame; the DI sends no `X-Frame-Options` or `frame-ancestors` header.
+- Without `EWS_DI_SSO_SECRET` none of this is active and `/auth/ews-sso` is an
+  ordinary page path.
+
 ## Updates
 
 Each release is a semantic-version tag with release notes on the repository's

@@ -95,6 +95,7 @@ import { SUPPORTED_LOCALES } from "@data-integrator/definitions"
 import { catalogTranslationStatus, startCatalogTranslation, translateDefinition, wrapDefinitionStrings } from "./localizeCatalog.js"
 import { createManagedUser, listUsers, resetPassword, setDisabled, setRole } from "./users.js"
 import { BuilderService, routeBuilder } from "./builder/drafts.js"
+import { EwsSsoConfig, isSsoAccount, NonceStore, safeNext, ssoAccount, ssoErrorPage, verifyEwsToken } from "./ewsSso.js"
 
 /** Static assets directory (demo map page). */
 const STATIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "static")
@@ -178,6 +179,7 @@ const COOKIE_MAX_AGE = 30 * 24 * 3600
  *   withheld. Null leaves the services as given, with no provider
  * @param viteDevUrl - Live Vite origin; null serves the built SPA from dist
  * @param builder - Source builder drafts; null when the host cannot run previews
+ * @param ewsSso - Single sign-on from the EWS; null leaves it off
  */
 export function createApiServer(
   pool: pg.Pool,
@@ -193,9 +195,12 @@ export function createApiServer(
   ai: AiRuntime | null = null,
   viteDevUrl: string | null = null,
   files: FileApiOptions | null = null,
-  builder: BuilderService | null = null
+  builder: BuilderService | null = null,
+  ewsSso: EwsSsoConfig | null = null
 ): Server {
   const uiDist = uiDistPath ?? DEFAULT_UI_DIST
+  // Each EWS handover token is accepted once
+  const ewsNonces = new NonceStore()
   const handle = async (req: IncomingMessage, res: ServerResponse) => {
     auditWrite(req, res, () => requestUsers.get(req) ?? null)
     if (!UPLOAD_PATH.test((req.url ?? "").split("?")[0])) limitRequestTime(req, res)
@@ -204,7 +209,7 @@ export function createApiServer(
       const live = ai === null || ai.configured()
       const model = ai?.configured() ? ai.model : null
       await route(pool, tiles, live ? agent : null, runs, store, live ? dashboardAgent : null, basemap, uiDist, libraryPath,
-        live ? assistantAgent : null, ai?.provider ?? null, viteDevUrl, model, files, ai, builder, req, res)
+        live ? assistantAgent : null, ai?.provider ?? null, viteDevUrl, model, files, ai, builder, ewsSso, ewsNonces, req, res)
     } catch (err) {
       if (!res.headersSent) res.writeHead(err instanceof ClientError ? err.status : 500, { "content-type": "application/json" })
       res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }))
@@ -264,6 +269,8 @@ async function route(
   files: FileApiOptions | null,
   ai: AiRuntime | null,
   builder: BuilderService | null,
+  ewsSso: EwsSsoConfig | null,
+  ewsNonces: NonceStore,
   req: IncomingMessage,
   res: ServerResponse
 ): Promise<void> {
@@ -323,10 +330,48 @@ async function route(
     return
   }
 
+  // Single sign-on from the EWS: a signed, single-use handover token signs
+  // the browser in as the shared account. Failures show a plain page, never a
+  // redirect, so they cannot loop
+  if (pathname === "/auth/ews-sso" && ewsSso && req.method === "GET") {
+    const noStore = { "cache-control": "no-store", "referrer-policy": "no-referrer" }
+    const refuse = (status: number, message: string, fields: Record<string, unknown>) => {
+      logSecurityEvent("auth.ews_sso", { ...fields, ...originFields(req) })
+      res.writeHead(status, { "content-type": "text/html; charset=utf-8", ...noStore })
+      res.end(ssoErrorPage(ewsSso, message))
+    }
+    const check = verifyEwsToken(searchParams.get("token") ?? "", ewsSso.secret, ewsNonces)
+    if (!check.ok) {
+      refuse(400, "The sign-in link is not valid or has expired. Open the Data Integrator again from the early warning system.",
+        { outcome: check.reason })
+      return
+    }
+    const account = await ssoAccount(pool, ewsSso)
+    if (!account) {
+      refuse(403, "The shared early warning account is disabled in the Data Integrator.", { outcome: "disabled", ewsSubject: check.subject })
+      return
+    }
+    logSecurityEvent("auth.ews_sso", { outcome: "success", ewsSubject: check.subject, ...actorFields(account), ...originFields(req) })
+    // A session the browser already had is replaced, not left behind
+    const previous = cookieToken(req)
+    if (previous) await deleteAuthSession(pool, previous)
+    const session = await createAuthSession(pool, account.id)
+    res.writeHead(302, { location: safeNext(searchParams.get("next")), "set-cookie": sessionCookie(session, req), ...noStore })
+    res.end()
+    return
+  }
+
   if (pathname === "/api/login" && req.method === "POST") {
     const body = await readJsonBody(req)
     const email = String(body.email ?? "")
     const password = String(body.password ?? "")
+    // The shared EWS account signs in only through the handover; refused
+    // before the password check so failures cannot lock it out
+    if (isSsoAccount(ewsSso, email)) {
+      logSecurityEvent("auth.login", { outcome: "sso-only", email, ...originFields(req) })
+      json(res, 401, { error: "Invalid email or password" })
+      return
+    }
     let result = await authenticate(pool, email, password)
     // An expired password signs in only together with its replacement
     if (!result.ok && result.reason === "password-expired") {
@@ -375,7 +420,10 @@ async function route(
 
   if (pathname === "/api/me") {
     if (!user) {
-      json(res, 401, { error: "not signed in" })
+      // With EWS single sign-on, the web app sends a signed-out browser to the
+      // EWS instead of the login form; API clients with a token are not told
+      const sso = ewsSso?.loginUrl && !authHeader ? { ewsLoginUrl: ewsSso.loginUrl } : {}
+      json(res, 401, { error: "not signed in", ...sso })
       return
     }
     // Hosted providers require the one-time data-processing acknowledgement;

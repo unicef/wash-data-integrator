@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react"
-import { AiInfo, getMe, getSettings, logout, User } from "./api.js"
+import { AiInfo, ewsLoginUrl, getMe, getSettings, logout, User } from "./api.js"
+import { claimAutoRedirect, clearAutoRedirect, ewsSignInHref, wantsLocalLogin } from "./ewsSso.js"
+import { SignedOut } from "./SignedOut.js"
 import { applyLocale, availableLocales, getSavedLocale, loadCronLocale, setOfferedLocales } from "./localization.js"
 import { AiAckHost, setAiInfo } from "./aiAck.js"
 import { AiPrivacy } from "./AiPrivacy.js"
@@ -67,6 +69,8 @@ interface Route {
   builder: boolean
   /** Builder draft to resume; null starts a new one */
   builderDraftId: string | null
+  /** True on the page shown after signing out when sign-in goes through the EWS */
+  signedOut: boolean
 }
 
 /** Current location parsed from the hash. */
@@ -98,7 +102,8 @@ function parseHash(): Route {
     layerId: layer ? layer[1] : null,
     layerSessionId: layer ? new URLSearchParams(query ?? "").get("session") : null,
     builder: builder !== null,
-    builderDraftId: builder?.[1] ?? null
+    builderDraftId: builder?.[1] ?? null,
+    signedOut: hash === "#/signed-out"
   }
 }
 
@@ -207,6 +212,7 @@ export function App() {
   const [, setOfferTick] = useState(0)
   useEffect(() => {
     getMe().then(me => {
+      if (me) clearAutoRedirect()
       setUser(me?.user ?? null)
       setAi(me?.ai ?? null)
       setAiInfo(me?.ai ?? null)
@@ -215,7 +221,8 @@ export function App() {
     const onChange = () => {
       if (allowHashChange()) setRoute(parseHash())
     }
-    const onAuthRequired = () => setUser(null)
+    // Asks /api/me again, which also says whether sign-in goes through the EWS
+    const onAuthRequired = () => void getMe().then(me => setUser(me?.user ?? null))
     const onLocalesChanged = () => setOfferTick(n => n + 1)
     window.addEventListener("hashchange", onChange)
     window.addEventListener("auth:required", onAuthRequired)
@@ -227,8 +234,23 @@ export function App() {
     }
   }, [])
 
+  // With EWS single sign-on, a signed-out browser signs in at the EWS instead
+  // of the login form, except on the signed-out page, a public dashboard and
+  // the local login (/?local=1). A second attempt within a minute stops on the
+  // signed-out page instead of looping
+  const ssoUrl = user === null && !route.signedOut && !route.dashboardId && !wantsLocalLogin() ? ewsLoginUrl() : null
+  const [ssoStuck, setSsoStuck] = useState(false)
+  useEffect(() => {
+    if (!ssoUrl) return
+    if (claimAutoRedirect()) window.location.replace(ewsSignInHref(ssoUrl, window.location.pathname + window.location.hash))
+    else setSsoStuck(true)
+  }, [ssoUrl])
+
   if (user === "loading") return null
   if (user === null) {
+    const loginUrl = ewsLoginUrl()
+    if (loginUrl && !wantsLocalLogin() && (route.signedOut || ssoStuck)) return <SignedOut loginUrl={loginUrl} failed={!route.signedOut} />
+    if (ssoUrl) return null
     // Public dashboards render without a session on their normal URL; the
     // server serves them only when their public flag is set
     if (route.dashboardId) {
@@ -282,7 +304,23 @@ export function App() {
         <span style={{ flex: 1 }} />
         <LanguageToggle locale={locale} onLocaleChange={setLocale} />
         {user.role === "admin" && <SettingsGear />}
-        <UserMenu user={user} onSignOut={() => logout().finally(() => setUser(null))} />
+        <UserMenu
+          user={user}
+          onSignOut={() =>
+            logout()
+              .catch(() => undefined)
+              // The signed-out answer says whether sign-in goes through the EWS;
+              // if so, land on the signed-out page instead of signing straight back in
+              .then(() => getMe())
+              .then(() => {
+                if (ewsLoginUrl()) {
+                  window.location.hash = "#/signed-out"
+                  setRoute(parseHash())
+                }
+                setUser(null)
+              })
+          }
+        />
       </header>
       {route.sessionId ? (
         <SessionView sessionId={route.sessionId} canDesign={canDesign} isAdmin={user.role === "admin"} userId={user.id} />

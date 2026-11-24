@@ -9610,6 +9610,42 @@
       "es": "Change the schedule on the source page",
       "mg": "Change the schedule on the source page",
       "sw": "Change the schedule on the source page"
+    },
+    {
+      "_base": "en",
+      "en": "Sign-in through the early warning system did not complete.",
+      "fr": "",
+      "pt": "",
+      "es": "",
+      "mg": "",
+      "sw": ""
+    },
+    {
+      "_base": "en",
+      "en": "Signed out",
+      "fr": "",
+      "pt": "",
+      "es": "",
+      "mg": "",
+      "sw": ""
+    },
+    {
+      "_base": "en",
+      "en": "Sign in with EWS",
+      "fr": "",
+      "pt": "",
+      "es": "",
+      "mg": "",
+      "sw": ""
+    },
+    {
+      "_base": "en",
+      "en": "Local admin login",
+      "fr": "",
+      "pt": "",
+      "es": "",
+      "mg": "",
+      "sw": ""
     }
   ],
   "unused": [

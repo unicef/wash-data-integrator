@@ -24,6 +24,10 @@ Two interchangeable credentials, both tied to a user and their role:
   tokens (id, name, created, last used, expiry; never the secret);
   `DELETE /api/tokens/:id` revokes one.
 
+With single sign-on from the EWS configured, `GET /auth/ews-sso?token=...&next=`
+also sets the `di_session` cookie, and a signed-out `GET /api/me` without a
+bearer token adds `ewsLoginUrl` to its 401 body (see docs/Deployment.md).
+
 A bearer token takes precedence over a cookie and carries its user's full
 role. Every route below needs one of the two unless it says otherwise.
 

@@ -11,6 +11,7 @@ import { loadSecretKey } from "./secrets.js"
 import { availableParallelism, totalmem } from "node:os"
 import { isIP } from "node:net"
 import { DEFAULT_RENDER_CONCURRENCY } from "./tiles.js"
+import type { EwsSsoConfig } from "./ewsSso.js"
 
 /** Reasoning efforts OpenRouter accepts for AGENT_EFFORT. */
 export const AGENT_EFFORTS = ["xhigh", "high", "medium", "low", "minimal", "none"] as const
@@ -72,6 +73,8 @@ export interface AppConfig {
   }
   /** Basemap proxy upstream; upstream null disables the proxy */
   basemap: { upstream: string | null; styleLight: string; styleDark: string }
+  /** Single sign-on from the EWS (EWS_DI_SSO_*); null when EWS_DI_SSO_SECRET is unset */
+  ewsSso: EwsSsoConfig | null
 }
 
 /** Host RAM the operating system, database, server, and tile renders keep for themselves. */
@@ -170,6 +173,22 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     problems.push(`VITE_DEV_URL must be a local http(s) origin, got "${viteDevUrl}"`)
   }
 
+  let ewsSso: EwsSsoConfig | null = null
+  if (env.EWS_DI_SSO_SECRET) {
+    const loginUrl = env.EWS_DI_SSO_LOGIN_URL?.trim() || null
+    const account = (env.EWS_DI_SSO_ACCOUNT?.trim() || "ews@gmail.com").toLowerCase()
+    const role = env.EWS_DI_SSO_ROLE?.trim() || "editor"
+    if (env.EWS_DI_SSO_SECRET.length < 32) problems.push("EWS_DI_SSO_SECRET must be at least 32 characters")
+    if (loginUrl && !/^https?:\/\/[^/\s]+\/\S*$/.test(loginUrl)) {
+      problems.push(`EWS_DI_SSO_LOGIN_URL must be an http(s) URL with a path, got "${loginUrl}"`)
+    }
+    if (!/^[^@\s]+@[^@\s]+$/.test(account)) problems.push(`EWS_DI_SSO_ACCOUNT must be an email address, got "${account}"`)
+    if (role !== "admin" && role !== "editor" && role !== "viewer") {
+      problems.push(`EWS_DI_SSO_ROLE must be admin, editor, or viewer, got "${role}"`)
+    }
+    ewsSso = { secret: env.EWS_DI_SSO_SECRET, loginUrl, account, role: role as EwsSsoConfig["role"] }
+  }
+
   if (problems.length > 0) {
     throw new Error(`Configuration errors:\n  - ${problems.join("\n  - ")}`)
   }
@@ -208,7 +227,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       upstream: basemapDisabled ? null : basemapRaw.replace(/\/+$/, ""),
       styleLight: env.BASEMAP_STYLE_LIGHT ?? "styles/positron",
       styleDark: env.BASEMAP_STYLE_DARK ?? "styles/dark"
-    }
+    },
+    ewsSso
   }
 }
 
@@ -232,6 +252,7 @@ export function describeConfig(config: AppConfig): string {
     `tileCache=${config.tileCachePath}`,
     `secrets=${config.secretKey ? "on" : "off"}`,
     `basemap=${config.basemap.upstream ?? "off"}`,
+    `ewsSso=${config.ewsSso ? (config.ewsSso.loginUrl ? "on" : "handover-only") : "off"}`,
     `ui=${config.viteDevUrl ? `vite:${config.viteDevUrl}` : "dist"}`
   ].join(" ")
 }
