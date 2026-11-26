@@ -1,5 +1,5 @@
 /**
- * Localization tool for the WASH Data Integrator UI.
+ * Localization tool for the Data Integrator UI.
  *
  * Extracts every T`...` string from src/ into src/localizations.json, and can
  * fill in missing translations with a language model or hand them to a human
@@ -137,7 +137,7 @@ async function translateBatch(
         .describe("Translations, one per input phrase, in the same order")
     }),
     system:
-      `You translate user interface strings for WASH Data Integrator, an open-source platform ` +
+      `You translate user interface strings for Data Integrator, an open-source platform ` +
       `for ingesting and harmonizing water and climate data. Translate from English into ` +
       `${localeName}.\n\n` +
       `Rules:\n` +
@@ -147,7 +147,7 @@ async function translateBatch(
       `- Preserve leading and trailing whitespace, ellipses (…), and surrounding punctuation.\n` +
       `- Keep the register terse and functional: these are buttons, headings and status ` +
       `messages, not prose.\n` +
-      `- Leave proper nouns, format names and identifiers untranslated (WASH Data Integrator, ` +
+      `- Leave proper nouns, format names and identifiers untranslated (Data Integrator, ` +
       `PostgreSQL, PostGIS, GeoTIFF, CSV, WorldPop, CHIRPS).\n` +
       (context ? `\n${context}` : ""),
     prompt: JSON.stringify(phrases, null, 2)

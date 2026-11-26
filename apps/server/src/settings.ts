@@ -26,7 +26,7 @@ export const DEFAULT_AOI_KEY = "default_aoi"
 export const SITE_TITLE_KEY = "site_title"
 
 /** Title to fall back to when the deployment has not set one. */
-export const DEFAULT_SITE_TITLE = "WASH Data Integrator"
+export const DEFAULT_SITE_TITLE = "Data Integrator"
 
 /** Reads one setting; null when unset. */
 export async function getSetting<T>(pool: pg.Pool, key: string): Promise<T | null> {

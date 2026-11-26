@@ -37,7 +37,7 @@ test("no mWater name in served UI text", async () => {
 test("README credits upstream", async () => {
   const readme = await readFile(path.join(ROOT, "README.md"), "utf8")
   assert.ok(readme.includes("https://github.com/mWater/data-integrator"))
-  assert.ok(readme.includes("WASH Data Integrator"))
+  assert.ok(readme.includes("Data Integrator"))
 })
 
 test("NOTICE keeps mWater", async () => {

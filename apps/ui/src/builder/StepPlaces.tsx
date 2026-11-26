@@ -1,6 +1,6 @@
 /**
  * Step 4: match the place column's names to the codes of a places table
- * already in WASH Data Integrator. Exact matches are chosen for the user;
+ * already in Data Integrator. Exact matches are chosen for the user;
  * close matches are offered, never chosen; any name can be left unmatched.
  */
 import { useEffect, useMemo, useState } from "react"

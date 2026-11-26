@@ -82,7 +82,8 @@ input:not([type=range]), textarea, select { background: var(--surface); color: v
   display: flex; align-items: center; gap: 24px;
   padding: 10px 20px; background: var(--topbar-bg); color: var(--topbar-ink);
 }
-.topbar .brand { font-weight: 600; color: var(--topbar-ink); text-decoration: none }
+.topbar .brand { font-weight: 600; color: var(--topbar-ink); text-decoration: none; display: flex; flex-direction: column; line-height: 1.2 }
+.topbar .brand small { font-weight: 400; font-size: 11px; color: var(--topbar-dim) }
 .topbar nav { display: flex; gap: 16px }
 .topbar nav a { color: var(--topbar-dim); text-decoration: none }
 .topbar nav a:hover { color: var(--topbar-ink) }
@@ -337,6 +338,7 @@ body.col-resizing iframe { pointer-events: none }
 .login-card h1 { margin: 0 0 8px; font-size: 20px; text-align: center }
 .login-card input { padding: 9px 12px; border: 1px solid var(--control-border); border-radius: 6px; font: inherit }
 .login-card p { margin: 0; text-align: center }
+.login-card p.login-studio { font-size: 13px; opacity: 0.75 }
 .login-card a { text-align: center }
 .login-card a.login-action { padding: 9px 12px; border-radius: 6px; background: var(--accent); color: var(--accent-ink); text-decoration: none }
 .list-page.wide { max-width: 1320px }

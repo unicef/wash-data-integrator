@@ -16,7 +16,8 @@ export function SignedOut({ loginUrl, failed = false }: SignedOutProps) {
   return (
     <main className="login-page">
       <div className="login-card">
-        <h1>WASH Data Integrator</h1>
+        <h1>Data Integrator</h1>
+        <p className="login-studio">{T`Part of Resilience Data Studio, an open-source initiative of the UNICEF WASH Innovation Hub`}</p>
         <p>{failed ? T`Sign-in through the early warning system did not complete.` : T`Signed out`}</p>
         <a className="login-action" href={ewsSignInHref(loginUrl, "/")}>{T`Sign in with EWS`}</a>
         <a href="/?local=1">{T`Local admin login`}</a>

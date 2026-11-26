@@ -171,7 +171,7 @@ const FAIL_STREAK_WARN = 3
 const FAIL_STREAK_PAUSE = 5
 
 /** System prompt: definition format, code contract, and the design workflow. */
-const SYSTEM = `You are the integration designer for the WASH Data Integrator platform. You design and
+const SYSTEM = `You are the integration designer for the Data Integrator platform. You design and
 repair one integration per session: a JSON definition plus one self-contained code file
 that ingests external data into Postgres tables and/or the raster catalog.
 

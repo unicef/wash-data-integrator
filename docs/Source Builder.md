@@ -51,7 +51,7 @@ for example), choose them to unpivot: the table then gets one row per place and
 date, with a date column and a value column.
 
 **4. Places.** If a column holds place names, match them to a places table that
-is already in WASH Data Integrator (for example administrative regions). Exact
+is already in Data Integrator (for example administrative regions). Exact
 matches are chosen for you. Close matches are offered but never chosen without
 you. Any name can be left unmatched. The table gets an extra column with the
 place code.

@@ -257,7 +257,7 @@ export function App() {
       return (
         <div className="app">
           <header className="topbar">
-            <a href="#/" className="brand">WASH Data Integrator</a>
+            <a href="#/" className="brand">Data Integrator<small>Resilience Data Studio</small></a>
             <span style={{ flex: 1 }} />
             <a className="topbar-signin" href="#/dashboards">{T`Sign In`}</a>
           </header>
@@ -292,7 +292,7 @@ export function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <a href="#/" className="brand">WASH Data Integrator</a>
+        <a href="#/" className="brand">Data Integrator<small>Resilience Data Studio</small></a>
         <nav>
           <a href="#/" aria-current={activeSection === "home" ? "page" : undefined}>{T`Home`}</a>
           <a href="#/data" aria-current={activeSection === "data" ? "page" : undefined}>{T`Data`}</a>

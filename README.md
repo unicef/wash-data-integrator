@@ -1,9 +1,9 @@
-# WASH Data Integrator
+# Data Integrator
 
-WASH Data Integrator is a fork of the mWater Data Integrator, maintained for the
-UNICEF WASH Innovation Hub. This fork adds a no-code source builder, so that
-new data sources can be added without writing integration code, alongside
-additions to the integration library.
+Data Integrator is one app of Resilience Data Studio, an open-source initiative
+of the UNICEF WASH Innovation Hub. It is a fork of the mWater Data Integrator. This fork adds a no-code source
+builder, so that new data sources can be added without writing integration
+code, alongside additions to the integration library.
 
 ## About
 
@@ -122,7 +122,7 @@ Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 ## Credits
 
-WASH Data Integrator is based on the mWater Data Integrator by mWater, released
+Data Integrator is based on the mWater Data Integrator by mWater, released
 under the Apache License 2.0. The upstream project is at
 https://github.com/mWater/data-integrator. This fork keeps the original
 license and notices; see LICENSE and NOTICE.
