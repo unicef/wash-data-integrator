@@ -61,7 +61,7 @@ export function Login({ onLogin }: LoginProps) {
     <main className="login-page">
       <form className="login-card" onSubmit={onSubmit}>
         <h1>Data Integrator</h1>
-        <p className="login-studio">{T`Part of Resilience Data Studio, an open-source initiative of the UNICEF WASH Innovation Hub`}</p>
+        <p className="login-studio">{T`Part of Data WASH Studio, an open-source initiative of the UNICEF WASH Innovation Hub`}</p>
         {expired ? (
           <>
             <p>{T`Your password has expired. Choose a new one to sign in.`}</p>
