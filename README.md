@@ -1,6 +1,6 @@
 # Data Integrator
 
-Data Integrator is one app of Resilience Data Studio, an open-source initiative
+Data Integrator is one app of Data WASH Studio, an open-source initiative
 of the UNICEF WASH Innovation Hub. It is a fork of the mWater Data Integrator. This fork adds a no-code source
 builder, so that new data sources can be added without writing integration
 code, alongside additions to the integration library.
